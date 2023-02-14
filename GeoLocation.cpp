@@ -187,46 +187,6 @@ public:
         std::cout << "Converted " << lineCount << " lines in " << duration.count() / 1000000.0 << " seconds" << std::endl;
     }
 
-    /*static void minOrdering(multiBoxGeo& boxes, size_t dim) {
-        if (dim == 0) {
-            // order by minX
-            auto sortRuleLambda = [] (rTreeValue b1, rTreeValue b2) -> bool
-            {
-                return b1.first.min_corner().get<0>() < b2.first.min_corner().get<0>();
-            };
-
-            std::sort(boxes.begin(), boxes.end(), sortRuleLambda);
-        } else if (dim == 1) {
-            // order by minY
-            auto sortRuleLambda = [] (rTreeValue b1, rTreeValue b2) -> bool
-            {
-                return b1.first.min_corner().get<1>() < b2.first.min_corner().get<1>();
-            };
-
-            std::sort(boxes.begin(), boxes.end(), sortRuleLambda);
-        }
-    }*/
-
-    /*static void maxOrdering(multiBoxGeo& boxes, size_t dim) {
-        if (dim == 0) {
-            // order by maxX
-            auto sortRuleLambda = [] (rTreeValue b1, rTreeValue b2) -> bool
-            {
-                return b1.first.max_corner().get<0>() < b2.first.max_corner().get<0>();
-            };
-
-            std::sort(boxes.begin(), boxes.end(), sortRuleLambda);
-        } else if (dim == 1) {
-            // order by maxY
-            auto sortRuleLambda = [] (rTreeValue b1, rTreeValue b2) -> bool
-            {
-                return b1.first.max_corner().get<1>() < b2.first.max_corner().get<1>();
-            };
-
-            std::sort(boxes.begin(), boxes.end(), sortRuleLambda);
-        }
-    }*/
-
     static void centerOrdering(multiBoxGeo& boxes, size_t dim) {
         if (dim == 0) {
             // order by centerX
@@ -271,17 +231,94 @@ public:
         return overlap + 0.2 * difference;
     }
 
+    static bool boxInList(rTreeValue box, const multiBoxGeo& s0BestDim, size_t bestDim) {
+
+        auto lessThanDim0 = [](rTreeValue box1, rTreeValue box2) {
+            double centerB1 = (box1.first.min_corner().get<0>() + box1.first.max_corner().get<0>()) / 2;
+            double centerB2 = (box2.first.min_corner().get<0>() + box2.first.max_corner().get<0>()) / 2;
+
+            return centerB1 < centerB2;
+        };
+
+        auto lessThanDim1 = [](rTreeValue box1, rTreeValue box2) {
+            double centerB1 = (box1.first.min_corner().get<1>() + box1.first.max_corner().get<1>()) / 2;
+            double centerB2 = (box2.first.min_corner().get<1>() + box2.first.max_corner().get<1>()) / 2;
+
+            return centerB1 < centerB2;
+        };
+
+        auto equalDim0 = [](rTreeValue box1, rTreeValue box2) {
+            double centerB1 = (box1.first.min_corner().get<0>() + box1.first.max_corner().get<0>()) / 2;
+            double centerB2 = (box2.first.min_corner().get<0>() + box2.first.max_corner().get<0>()) / 2;
+
+            return centerB1 == centerB2;
+        };
+
+        auto equalDim1 = [](rTreeValue box1, rTreeValue box2) {
+            double centerB1 = (box1.first.min_corner().get<1>() + box1.first.max_corner().get<1>()) / 2;
+            double centerB2 = (box2.first.min_corner().get<1>() + box2.first.max_corner().get<1>()) / 2;
+
+            return centerB1 == centerB2;
+        };
+
+        if (bestDim == 0) {
+            auto lower = std::lower_bound(s0BestDim.begin(), s0BestDim.end(), box, lessThanDim0);
+            if (lower != s0BestDim.end()) {
+                size_t index = std::distance(s0BestDim.begin(), lower);
+
+                while(index < s0BestDim.size() && equalDim0(box, s0BestDim[index])) {
+                    if (box.second == s0BestDim[index].second) {
+                        return true;
+                    }
+                    index++;
+                }
+            }
+        } else {
+            auto lower = std::lower_bound(s0BestDim.begin(), s0BestDim.end(), box, lessThanDim1);
+            if (lower != s0BestDim.end()) {
+                size_t index = std::distance(s0BestDim.begin(), lower);
+
+                while(index < s0BestDim.size() && equalDim1(box, s0BestDim[index])) {
+                    if (box.second == s0BestDim[index].second) {
+                        return true;
+                    }
+                    index++;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    static bool elementBelongsToFirstBox(rTreeValue box, boxGeo bestB0, boxGeo bestB1, const multiBoxGeo& s0BestDim, size_t bestDim) {
+        bool onlyWithinB0AndOverlap;
+        bool onlyWithinB1AndOverlap;
+        if (bestDim == 0) {
+            onlyWithinB0AndOverlap = box.first.min_corner().get<0>() < bestB1.min_corner().get<0>();
+            onlyWithinB1AndOverlap = box.first.max_corner().get<0>() > bestB0.max_corner().get<0>();
+        } else {
+            onlyWithinB0AndOverlap = box.first.min_corner().get<1>() < bestB1.min_corner().get<1>();
+            onlyWithinB1AndOverlap = box.first.max_corner().get<1>() > bestB0.max_corner().get<1>();
+        }
+
+        if (onlyWithinB0AndOverlap) {
+            return true;
+        }
+
+        if (onlyWithinB1AndOverlap) {
+            return false;
+        }
+
+        // in any other case, the box is completely in the overlap -> no information about the assignment
+        return boxInList(box, s0BestDim, bestDim);
+    }
+
     static std::vector<multiBoxGeo> TGSRecursive(const std::vector<multiBoxGeo>& orderedInputRectangles, size_t S, size_t M) {  // https://dl.acm.org/doi/pdf/10.1145/288692.288723
         /*
          * inputRectangles needs to be pre-sorted with centerOrdering for both d0 and d1
          */
 
         size_t n = orderedInputRectangles[0].size();
-
-        /*std::vector<orderingFunc> orderingFunctions;
-        orderingFunctions.push_back(minOrdering);
-        orderingFunctions.push_back(maxOrdering);
-        orderingFunctions.push_back(centerOrdering);*/
 
         if (n <= S) {
             // stop condition
@@ -290,79 +327,70 @@ public:
 
         double bestCost = -1;
         size_t bestDim = 0;
-        //orderingFunc bestOrdering = minOrdering;
         unsigned long bestI = 1;
         boxGeo bestB0 = createBoundingBox(0, 0, 0, 0);
         boxGeo bestB1 = createBoundingBox(0, 0, 0, 0);
 
         for (size_t dim = 0; dim <= 1; dim++) {
-            //for (orderingFunc& orderingFunction : orderingFunctions) {
-                //orderingFunction(inputRectangles, dim);
-                for (size_t i = 1; i < n / M; i++) {
-                    // calculate B0 and B1
-                    double minXB0 = -1;
-                    double minYB0 = -1;
-                    double maxXB0 = -1;
-                    double maxYB0 = -1;
+            for (size_t i = 1; i < n / M; i++) {
+                // calculate B0 and B1
+                double minXB0 = -1;
+                double minYB0 = -1;
+                double maxXB0 = -1;
+                double maxYB0 = -1;
 
-                    double minXB1 = -1;
-                    double minYB1 = -1;
-                    double maxXB1 = -1;
-                    double maxYB1 = -1;
-                    for (size_t ix = 0; ix < orderedInputRectangles[dim].size(); ix++) {
-                        if (ix <= i * S) {
-                            //calculate B0
-                            if (minXB0 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<0>() < minXB0) {
-                                minXB0 = orderedInputRectangles[dim][ix].first.min_corner().get<0>();
-                            }
-                            if (minYB0 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<1>() < minYB0) {
-                                minYB0 = orderedInputRectangles[dim][ix].first.min_corner().get<1>();
-                            }
+                double minXB1 = -1;
+                double minYB1 = -1;
+                double maxXB1 = -1;
+                double maxYB1 = -1;
+                for (size_t ix = 0; ix < orderedInputRectangles[dim].size(); ix++) {
+                    if (ix <= i * S) {
+                        //calculate B0
+                        if (minXB0 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<0>() < minXB0) {
+                            minXB0 = orderedInputRectangles[dim][ix].first.min_corner().get<0>();
+                        }
+                        if (minYB0 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<1>() < minYB0) {
+                            minYB0 = orderedInputRectangles[dim][ix].first.min_corner().get<1>();
+                        }
 
-                            if (orderedInputRectangles[dim][ix].first.max_corner().get<0>() > maxXB0) {
-                                maxXB0 = orderedInputRectangles[dim][ix].first.max_corner().get<0>();
-                            }
-                            if (orderedInputRectangles[dim][ix].first.max_corner().get<1>() > maxYB0) {
-                                maxYB0 = orderedInputRectangles[dim][ix].first.max_corner().get<1>();
-                            }
-                        } else {
-                            // calculate B1
-                            if (minXB1 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<0>() < minXB1) {
-                                minXB1 = orderedInputRectangles[dim][ix].first.min_corner().get<0>();
-                            }
-                            if (minYB1 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<1>() < minYB1) {
-                                minYB1 = orderedInputRectangles[dim][ix].first.min_corner().get<1>();
-                            }
+                        if (orderedInputRectangles[dim][ix].first.max_corner().get<0>() > maxXB0) {
+                            maxXB0 = orderedInputRectangles[dim][ix].first.max_corner().get<0>();
+                        }
+                        if (orderedInputRectangles[dim][ix].first.max_corner().get<1>() > maxYB0) {
+                            maxYB0 = orderedInputRectangles[dim][ix].first.max_corner().get<1>();
+                        }
+                    } else {
+                        // calculate B1
+                        if (minXB1 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<0>() < minXB1) {
+                            minXB1 = orderedInputRectangles[dim][ix].first.min_corner().get<0>();
+                        }
+                        if (minYB1 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<1>() < minYB1) {
+                            minYB1 = orderedInputRectangles[dim][ix].first.min_corner().get<1>();
+                        }
 
-                            if (orderedInputRectangles[dim][ix].first.max_corner().get<0>() > maxXB1) {
-                                maxXB1 = orderedInputRectangles[dim][ix].first.max_corner().get<0>();
-                            }
-                            if (orderedInputRectangles[dim][ix].first.max_corner().get<1>() > maxYB1) {
-                                maxYB1 = orderedInputRectangles[dim][ix].first.max_corner().get<1>();
-                            }
+                        if (orderedInputRectangles[dim][ix].first.max_corner().get<0>() > maxXB1) {
+                            maxXB1 = orderedInputRectangles[dim][ix].first.max_corner().get<0>();
+                        }
+                        if (orderedInputRectangles[dim][ix].first.max_corner().get<1>() > maxYB1) {
+                            maxYB1 = orderedInputRectangles[dim][ix].first.max_corner().get<1>();
                         }
                     }
-
-                    boxGeo b0 = createBoundingBox(minXB0, minYB0, maxXB0, maxYB0);
-                    boxGeo b1 = createBoundingBox(minXB1, minYB1, maxXB1, maxYB1);
-
-                    double cost = costFunctionTGS(b0, b1);
-
-                    if (bestCost == -1 || cost < bestCost) {
-                        bestCost = cost;
-                        bestDim = dim;
-                        //bestOrdering = orderingFunction;
-                        bestI = i;
-                        bestB0 = b0;
-                        bestB1 = b1;
-                    }
                 }
-            //}
-        }
 
-        /*if (bestOrdering != centerOrdering) {
-            bestOrdering(inputRectangles, bestDim);
-        }*/
+                boxGeo b0 = createBoundingBox(minXB0, minYB0, maxXB0, maxYB0);
+                boxGeo b1 = createBoundingBox(minXB1, minYB1, maxXB1, maxYB1);
+
+                double cost = costFunctionTGS(b0, b1);
+
+                if (bestCost == -1 || cost < bestCost) {
+                    bestCost = cost;
+                    bestDim = dim;
+                    bestI = i;
+                    bestB0 = b0;
+                    bestB1 = b1;
+                }
+            }
+        }
 
         // split the rectangles
         multiBoxGeo s0BestDim(orderedInputRectangles[bestDim].begin(), orderedInputRectangles[bestDim].begin() + bestI * S);
@@ -374,11 +402,7 @@ public:
         size_t otherDim = 1 - bestDim;
 
         for (rTreeValue box : orderedInputRectangles[otherDim]) {
-            double centerX = (box.first.min_corner().get<0>() + box.first.max_corner().get<0>()) / 2;
-            double centerY = (box.first.min_corner().get<1>() + box.first.max_corner().get<1>()) / 2;
-            auto center = make<pointGeo>(centerX, centerY);
-
-            if (bg::within(center, bestB0)) {
+            if (elementBelongsToFirstBox(box, bestB0, bestB1, s0BestDim, bestDim)) {
                 s0OtherDim.push_back(box);
             } else {
                 s1OtherDim.push_back(box);
@@ -526,10 +550,10 @@ void showCase() {
 
 
     auto startTime = std::chrono::high_resolution_clock::now();
-    //test.Search(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../100k3");
+    //test.Search(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../100k4");
     multiBoxGeo boxes = test.loadEntries("../data100k.csv");
     std::vector<multiBoxGeo> result = test.TGS(boxes, 316, 316);
-    //test.saveTGSResult(result, "../germany");
+    //test.saveTGSResult(result, "../100k4");
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
     std::cout << "Searched in " << duration.count() / 1000000.0 << " seconds" << std::endl;
