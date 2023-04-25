@@ -7,6 +7,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include "Rtree.h"
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -20,8 +21,6 @@ using multiBoxGeo = std::vector<rTreeValue>;
 using boundingBoxValues = std::vector<std::pair<std::pair<double, double>, std::pair<double, double>>>;
 using bg::append;
 using bg::make;
-
-typedef void(*orderingFunc)(multiBoxGeo& boxes, size_t dim);
 
 class GeoLocation {
 private:
@@ -213,104 +212,18 @@ public:
 
     static double costFunctionTGS(boxGeo& b0, boxGeo& b1) {
         /*
-         * Since the preprocessing needs to assign S elements to a number of rectangles in a way
-         * that the rectangles don't overlap much, we need to minimize the overlap. Additionally, we want both
-         * boxes to have a similar area, so that the algorithm terminates faster
-         * -> the cost is the overlap of the boxes and the difference of both box areas
+         * To accelerate the algorithm, make sure that both boxes are of similar size.
          */
-
-        double xOverlap = std::max(0.0, std::min(b0.max_corner().get<0>(), b1.max_corner().get<0>()) - std::max(b0.min_corner().get<0>(), b1.min_corner().get<0>()));
-        double yOverlap = std::max(0.0, std::min(b0.max_corner().get<1>(), b1.max_corner().get<1>()) - std::max(b0.min_corner().get<1>(), b1.min_corner().get<1>()));
-        double overlap = xOverlap * yOverlap;
 
         double areaB0 = (b0.max_corner().get<0>() - b0.min_corner().get<0>()) * (b0.max_corner().get<1>() - b0.min_corner().get<1>());
         double areaB1 = (b1.max_corner().get<0>() - b1.min_corner().get<0>()) * (b1.max_corner().get<1>() - b1.min_corner().get<1>());
         double difference = std::abs(areaB0 - areaB1);
 
-        // give certain weights to the costs
-        return overlap + 0.2 * difference;
+        return difference;
     }
 
-    static bool boxInList(rTreeValue box, const multiBoxGeo& s0BestDim, size_t bestDim) {
-
-        auto lessThanDim0 = [](rTreeValue box1, rTreeValue box2) {
-            double centerB1 = (box1.first.min_corner().get<0>() + box1.first.max_corner().get<0>()) / 2;
-            double centerB2 = (box2.first.min_corner().get<0>() + box2.first.max_corner().get<0>()) / 2;
-
-            return centerB1 < centerB2;
-        };
-
-        auto lessThanDim1 = [](rTreeValue box1, rTreeValue box2) {
-            double centerB1 = (box1.first.min_corner().get<1>() + box1.first.max_corner().get<1>()) / 2;
-            double centerB2 = (box2.first.min_corner().get<1>() + box2.first.max_corner().get<1>()) / 2;
-
-            return centerB1 < centerB2;
-        };
-
-        auto equalDim0 = [](rTreeValue box1, rTreeValue box2) {
-            double centerB1 = (box1.first.min_corner().get<0>() + box1.first.max_corner().get<0>()) / 2;
-            double centerB2 = (box2.first.min_corner().get<0>() + box2.first.max_corner().get<0>()) / 2;
-
-            return centerB1 == centerB2;
-        };
-
-        auto equalDim1 = [](rTreeValue box1, rTreeValue box2) {
-            double centerB1 = (box1.first.min_corner().get<1>() + box1.first.max_corner().get<1>()) / 2;
-            double centerB2 = (box2.first.min_corner().get<1>() + box2.first.max_corner().get<1>()) / 2;
-
-            return centerB1 == centerB2;
-        };
-
-        if (bestDim == 0) {
-            auto lower = std::lower_bound(s0BestDim.begin(), s0BestDim.end(), box, lessThanDim0);
-            if (lower != s0BestDim.end()) {
-                size_t index = std::distance(s0BestDim.begin(), lower);
-
-                while(index < s0BestDim.size() && equalDim0(box, s0BestDim[index])) {
-                    if (box.second == s0BestDim[index].second) {
-                        return true;
-                    }
-                    index++;
-                }
-            }
-        } else {
-            auto lower = std::lower_bound(s0BestDim.begin(), s0BestDim.end(), box, lessThanDim1);
-            if (lower != s0BestDim.end()) {
-                size_t index = std::distance(s0BestDim.begin(), lower);
-
-                while(index < s0BestDim.size() && equalDim1(box, s0BestDim[index])) {
-                    if (box.second == s0BestDim[index].second) {
-                        return true;
-                    }
-                    index++;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    static bool elementBelongsToFirstBox(rTreeValue box, boxGeo bestB0, boxGeo bestB1, const multiBoxGeo& s0BestDim, size_t bestDim) {
-        bool onlyWithinB0AndOverlap;
-        bool onlyWithinB1AndOverlap;
-        if (bestDim == 0) {
-            onlyWithinB0AndOverlap = box.first.min_corner().get<0>() < bestB1.min_corner().get<0>();
-            onlyWithinB1AndOverlap = box.first.max_corner().get<0>() > bestB0.max_corner().get<0>();
-        } else {
-            onlyWithinB0AndOverlap = box.first.min_corner().get<1>() < bestB1.min_corner().get<1>();
-            onlyWithinB1AndOverlap = box.first.max_corner().get<1>() > bestB0.max_corner().get<1>();
-        }
-
-        if (onlyWithinB0AndOverlap) {
-            return true;
-        }
-
-        if (onlyWithinB1AndOverlap) {
-            return false;
-        }
-
-        // in any other case, the box is completely in the overlap -> no information about the assignment
-        return boxInList(box, s0BestDim, bestDim);
+    static bool pointWithinBox(pointGeo point, boxGeo box) {
+        return point.get<0>() >= box.min_corner().get<0>() && point.get<0>() <= box.max_corner().get<0>() && point.get<1>() >= box.min_corner().get<1>() && point.get<1>() <= box.max_corner().get<1>();
     }
 
     static std::vector<multiBoxGeo> TGSRecursive(const std::vector<multiBoxGeo>& orderedInputRectangles, size_t S, size_t M) {  // https://dl.acm.org/doi/pdf/10.1145/288692.288723
@@ -329,56 +242,37 @@ public:
         size_t bestDim = 0;
         unsigned long bestI = 1;
         boxGeo bestB0 = createBoundingBox(0, 0, 0, 0);
-        boxGeo bestB1 = createBoundingBox(0, 0, 0, 0);
 
         for (size_t dim = 0; dim <= 1; dim++) {
             for (size_t i = 1; i < n / M; i++) {
                 // calculate B0 and B1
-                double minXB0 = -1;
-                double minYB0 = -1;
-                double maxXB0 = -1;
-                double maxYB0 = -1;
+                double minXB0 = 0;
+                double minYB0 = 0;
+                double maxXB0 = 1;
+                double maxYB0 = 1;
 
-                double minXB1 = -1;
-                double minYB1 = -1;
-                double maxXB1 = -1;
-                double maxYB1 = -1;
-                for (size_t ix = 0; ix < orderedInputRectangles[dim].size(); ix++) {
-                    if (ix <= i * S) {
-                        //calculate B0
-                        if (minXB0 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<0>() < minXB0) {
-                            minXB0 = orderedInputRectangles[dim][ix].first.min_corner().get<0>();
-                        }
-                        if (minYB0 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<1>() < minYB0) {
-                            minYB0 = orderedInputRectangles[dim][ix].first.min_corner().get<1>();
-                        }
+                double minXB1 = 0;
+                double minYB1 = 0;
+                double maxXB1 = 1;
+                double maxYB1 = 1;
 
-                        if (orderedInputRectangles[dim][ix].first.max_corner().get<0>() > maxXB0) {
-                            maxXB0 = orderedInputRectangles[dim][ix].first.max_corner().get<0>();
-                        }
-                        if (orderedInputRectangles[dim][ix].first.max_corner().get<1>() > maxYB0) {
-                            maxYB0 = orderedInputRectangles[dim][ix].first.max_corner().get<1>();
-                        }
-                    } else {
-                        // calculate B1
-                        if (minXB1 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<0>() < minXB1) {
-                            minXB1 = orderedInputRectangles[dim][ix].first.min_corner().get<0>();
-                        }
-                        if (minYB1 == -1 || orderedInputRectangles[dim][ix].first.min_corner().get<1>() < minYB1) {
-                            minYB1 = orderedInputRectangles[dim][ix].first.min_corner().get<1>();
-                        }
+                if (dim == 0) {
+                    minXB0 = (orderedInputRectangles[dim][0].first.min_corner().get<0>() + orderedInputRectangles[dim][0].first.max_corner().get<0>()) / 2;
+                    maxXB0 = (orderedInputRectangles[dim][i * S].first.min_corner().get<0>() + orderedInputRectangles[dim][i * S].first.max_corner().get<0>()) / 2;
 
-                        if (orderedInputRectangles[dim][ix].first.max_corner().get<0>() > maxXB1) {
-                            maxXB1 = orderedInputRectangles[dim][ix].first.max_corner().get<0>();
-                        }
-                        if (orderedInputRectangles[dim][ix].first.max_corner().get<1>() > maxYB1) {
-                            maxYB1 = orderedInputRectangles[dim][ix].first.max_corner().get<1>();
-                        }
-                    }
+                    minXB1 = (orderedInputRectangles[dim][i * S + 1].first.min_corner().get<0>() + orderedInputRectangles[dim][i * S + 1].first.max_corner().get<0>()) / 2;
+                    maxXB1 = (orderedInputRectangles[dim][orderedInputRectangles[dim].size() - 1].first.min_corner().get<0>() + orderedInputRectangles[dim][orderedInputRectangles[dim].size() - 1].first.max_corner().get<0>()) / 2;
+                } else {
+                    minYB0 = (orderedInputRectangles[dim][0].first.min_corner().get<1>() + orderedInputRectangles[dim][0].first.max_corner().get<1>()) / 2;
+                    maxYB0 = (orderedInputRectangles[dim][i * S].first.min_corner().get<1>() + orderedInputRectangles[dim][i * S].first.max_corner().get<1>()) / 2;
+
+                    minYB1 = (orderedInputRectangles[dim][i * S + 1].first.min_corner().get<1>() + orderedInputRectangles[dim][i * S + 1].first.max_corner().get<1>()) / 2;
+                    maxYB1 = (orderedInputRectangles[dim][orderedInputRectangles[dim].size() - 1].first.min_corner().get<1>() + orderedInputRectangles[dim][orderedInputRectangles[dim].size() - 1].first.max_corner().get<1>()) / 2;
                 }
 
                 boxGeo b0 = createBoundingBox(minXB0, minYB0, maxXB0, maxYB0);
                 boxGeo b1 = createBoundingBox(minXB1, minYB1, maxXB1, maxYB1);
+
 
                 double cost = costFunctionTGS(b0, b1);
 
@@ -387,7 +281,6 @@ public:
                     bestDim = dim;
                     bestI = i;
                     bestB0 = b0;
-                    bestB1 = b1;
                 }
             }
         }
@@ -402,7 +295,14 @@ public:
         size_t otherDim = 1 - bestDim;
 
         for (rTreeValue box : orderedInputRectangles[otherDim]) {
-            if (elementBelongsToFirstBox(box, bestB0, bestB1, s0BestDim, bestDim)) {
+            //if (elementBelongsToFirstBox(box, bestB0, bestB1, s0BestDim, bestDim)) {
+            pointGeo boxCenter;
+            if (bestDim == 0) {
+                boxCenter = make<pointGeo>((box.first.min_corner().get<0>() + box.first.max_corner().get<0>()) / 2, 0.5);
+            } else {
+                boxCenter = make<pointGeo>(0.5, (box.first.min_corner().get<1>() + box.first.max_corner().get<1>()) / 2);
+            }
+            if (pointWithinBox(boxCenter, bestB0) && s0OtherDim.size() < bestI * S) {
                 s0OtherDim.push_back(box);
             } else {
                 s1OtherDim.push_back(box);
@@ -506,13 +406,21 @@ public:
             unsigned int id = baseResult.second;
 
             multiBoxGeo entries = loadEntries(folder + "/file_" + std::to_string(id) + ".csv");
-            createEntries(entries);
 
-            multiBoxGeo results = SearchInTree(query);
+            for (const rTreeValue& result : entries) {
+                if (bg::intersects(result.first, query)) {
+                    std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
+                              << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
+                }
+            }
+
+            //createEntries(entries);
+
+            /*multiBoxGeo results = SearchInTree(query);
             for (rTreeValue result : results) {
                 std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
                         << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
-            }
+            }*/
         }
 
     }
@@ -550,10 +458,16 @@ void showCase() {
 
 
     auto startTime = std::chrono::high_resolution_clock::now();
-    //test.Search(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../100k4");
-    multiBoxGeo boxes = test.loadEntries("../data100k.csv");
-    std::vector<multiBoxGeo> result = test.TGS(boxes, 316, 316);
-    //test.saveTGSResult(result, "../100k4");
+    //test.Search(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany");
+    //multiBoxGeo boxes = test.loadEntries("../germany_data_tidy.csv");
+    //std::vector<multiBoxGeo> result = test.TGS(boxes, 6633, 6633);
+    //test.saveTGSResult(result, "../germany");
+
+    // new tests
+    multiBoxGeo boxes = test.loadEntries("../testOut.csv");
+    Rtree tree = Rtree();
+    tree.BuildTree(boxes, 2);
+
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
     std::cout << "Searched in " << duration.count() / 1000000.0 << " seconds" << std::endl;
