@@ -34,3 +34,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+
+set(Boost_INCLUDE_DIR /Users/noahs-mbp/developing/Boost/installation/include)
+set(Boost_LIBRARY_DIR /Users/noahs-mbp/developing/Boost/installation/lib)
+find_package(Boost COMPONENTS serialization REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
+link_directories(${Boost_LIBRARY_DIR})
+target_link_libraries(Bachelorprojekt ${Boost_LIBRARIES})

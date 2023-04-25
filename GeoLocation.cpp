@@ -158,6 +158,7 @@ public:
     static void convertWKTFile(const std::string& fileFromPath, const std::string& fileToPath) {
         std::ifstream infile(fileFromPath);
         size_t lineCount = 0;
+        size_t id = 1;
 
         std::cout << "Starting to convert the file" << std::endl;
         auto startTime = std::chrono::high_resolution_clock::now();
@@ -174,7 +175,8 @@ public:
                     double minY = box.first.second;
                     double maxX = box.second.first;
                     double maxY = box.second.second;
-                    outfile << minX << " " << minY << "," << maxX << " " << maxY << "," << lineCount << std::endl;
+                    outfile << minX << " " << minY << "," << maxX << " " << maxY << "," << id << std::endl;
+                    id++;
                 }
             }
             if (lineCount % 100000 == 0) {
@@ -426,6 +428,23 @@ public:
     }
 };
 
+void CheckForDuplicateIds(multiBoxGeo& boxes) {
+    std::vector<unsigned int> cache;
+    int i = 0;
+    for (rTreeValue box : boxes) {
+        bool found = false;
+        for (unsigned int id : cache) {
+            if (id == box.second) {
+                std::cout << id << std::endl;
+                i++;
+                found = true;
+            }
+        }
+        cache.push_back(box.second);
+    }
+    std::cout << "Found " << i << " duplicates" << std::endl;
+}
+
 void showCase() {
     GeoLocation test;
     //multiPolygonGeo m;
@@ -457,7 +476,6 @@ void showCase() {
     //std::cout << "finished";
 
 
-    auto startTime = std::chrono::high_resolution_clock::now();
     //test.Search(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany");
     //multiBoxGeo boxes = test.loadEntries("../germany_data_tidy.csv");
     //std::vector<multiBoxGeo> result = test.TGS(boxes, 6633, 6633);
@@ -465,8 +483,18 @@ void showCase() {
 
     // new tests
     multiBoxGeo boxes = test.loadEntries("../testOut.csv");
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     Rtree tree = Rtree();
-    tree.BuildTree(boxes, 2);
+    /*Node test_ = Node(7, test.createBoundingBox(0, 0, 1, 1));
+    Node test_2 = Node(2, test.createBoundingBox(2, 2, 3, 3));
+    Node test__2 = Node(42, test.createBoundingBox(123, 456, 789, 369));
+    test_.AddChild(test_2);
+    test_.AddChild(test__2);
+    SaveNode(test_, false, "../test.bin");*/
+    Node test_3 = loadNode("../test.bin");
+    //tree.BuildTree(boxes, 2);
+    //CheckForDuplicateIds(boxes);
 
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
