@@ -476,13 +476,14 @@ void showCase() {
     //std::cout << "finished";
 
 
-    //test.Search(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany");
+    //auto startTime = std::chrono::high_resolution_clock::now();
+    //test.Search(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../100k");
     //multiBoxGeo boxes = test.loadEntries("../germany_data_tidy.csv");
     //std::vector<multiBoxGeo> result = test.TGS(boxes, 6633, 6633);
     //test.saveTGSResult(result, "../germany");
 
     // new tests
-    multiBoxGeo boxes = test.loadEntries("../testOut.csv");
+    //multiBoxGeo boxes = test.loadEntries("../data100k.csv");
     auto startTime = std::chrono::high_resolution_clock::now();
 
     Rtree tree = Rtree();
@@ -492,8 +493,14 @@ void showCase() {
     test_.AddChild(test_2);
     test_.AddChild(test__2);
     SaveNode(test_, false, "../test.bin");*/
-    Node test_3 = loadNode("../test.bin");
-    //tree.BuildTree(boxes, 2);
+    //Node test_3 = loadNode("../test.bin");
+    //tree.BuildTree(boxes, 16, "../100k_new");
+    multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../100k_new");
+    std::cout << "Found " << results.size() << " results:" << std::endl;
+    for(rTreeValue result : results) {
+        std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
+                  << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
+    }
     //CheckForDuplicateIds(boxes);
 
     auto stopTime = std::chrono::high_resolution_clock::now();

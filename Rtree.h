@@ -31,7 +31,7 @@ protected:
     unsigned int id;
     boxGeo boundingBox;
     bool isLastInnerNode = false;
-    std::vector<std::pair<unsigned int, boxGeo>> children;
+    multiBoxGeo children;
 
     template<class Archive>
     void serialize(Archive & a, const unsigned int version) {
@@ -46,19 +46,22 @@ protected:
 public:
     Node();
     Node(unsigned int id, boxGeo boundingBox);
-    Node(unsigned int id, boxGeo boundingBox, std::vector<std::pair<unsigned int, boxGeo>>& children, bool isLastInnerNode);
+    Node(unsigned int id, boxGeo boundingBox, multiBoxGeo &children, bool isLastInnerNode);
     Node(unsigned int id, double minX, double minY, double maxX, double maxY, bool isLastInnerNode);
     unsigned int GetId() const;
     boxGeo GetBoundingBox() const;
     void AddChild(Node& child);
     void SetIsLastInnerNode(bool isLastInnerNode);
+    bool GetIsLastInnerNode();
+    multiBoxGeo GetChildren();
 };
 
 BOOST_CLASS_VERSION(Node, 1)
 
 class Rtree {
 public:
-    void BuildTree(multiBoxGeo& inputRectangles, size_t M);
+    void BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder);
+    multiBoxGeo SearchTree(boxGeo query, const std::string& folder);
 };
 
 class ConstructionNode: public Node {

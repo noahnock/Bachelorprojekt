@@ -4,26 +4,13 @@
 
 #include "Rtree.h"
 
-void SaveNode(Node &node, bool isLastInnerNode, const std::string& fileName) {
-    node.SetIsLastInnerNode(isLastInnerNode);
-    std::ofstream outfile(fileName, std::ios::binary);
-    {
-        boost::archive::binary_oarchive archive(outfile);
-        archive << node;
-    }
-    outfile.close();
-}
+bool intersects(const boxGeo &b1, const boxGeo &b2) {
+    bool notIntersecting = b1.min_corner().get<0>() > b2.max_corner().get<0>() ||
+                         b2.min_corner().get<0>() > b1.max_corner().get<0>() ||
+                         b1.min_corner().get<1>() > b2.max_corner().get<1>() ||
+                         b2.min_corner().get<1>() > b1.max_corner().get<1>();
 
-Node loadNode(const std::string& fileName) {
-    std::ifstream ifs(fileName, std::ios::binary);
-    Node newNode;
-    {
-        boost::archive::binary_iarchive ia(ifs);
-        ia >> newNode;
-    }
-    ifs.close();
-
-    return newNode;
+    return !notIntersecting;
 }
 
 static void centerOrdering(multiBoxGeo& boxes, size_t dim) {
@@ -211,7 +198,8 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
     return result;
 }
 
-void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M) {
+void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder) {
+    std::filesystem::create_directory(folder);
     // sort the rectangles
     std::vector<multiBoxGeo> orderedInputRectangles;
 
@@ -242,7 +230,7 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M) {
                 Node leafNode = Node(box.second, box.first);
                 currentItem.AddChild(leafNode);
             }
-            SaveNode(currentItem, true, "../test.bin");
+            SaveNode(currentItem, true, folder + "/id_" + std::to_string(currentItem.GetId()) + ".bin");
         } else {
             std::vector<std::vector<multiBoxGeo>> tgsResult = TGSRecursive(currentItem.GetOrderedBoxes(), M, std::ceil(((float) currentItem.GetOrderedBoxes()[0].size()) / ((float) M)));
             for (std::vector<multiBoxGeo>& currentOrderedRectangles : tgsResult) {
@@ -254,9 +242,34 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M) {
                 newId++;
             }
 
-            SaveNode(currentItem, false, "../test.bin");
+            SaveNode(currentItem, false, folder + "/id_" + std::to_string(currentItem.GetId()) + ".bin");
         }
     }
+}
+
+multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
+    Node rootNode = loadNode(folder + "/id_0.bin");
+    multiBoxGeo results;
+    std::stack<Node> nodes;
+    nodes.push(rootNode);
+
+    while(!nodes.empty()) {
+        Node currentNode = nodes.top();
+        nodes.pop();
+
+        for (rTreeValue child : currentNode.GetChildren()) {
+            if (intersects(query, child.first)) {
+                if (currentNode.GetIsLastInnerNode()) {
+                    results.push_back(child);
+                } else {
+                    Node newNode = loadNode(folder + "/id_" + std::to_string(child.second) + ".bin");
+                    nodes.push(newNode);
+                }
+            }
+        }
+    }
+
+    return results;
 }
 
 ConstructionNode::ConstructionNode(unsigned int id, std::vector<multiBoxGeo> orderedBoxes)
@@ -312,7 +325,7 @@ Node::Node(unsigned int id) {
 
 Node::Node() {}
 
-Node::Node(unsigned int id, boxGeo boundingBox, std::vector<std::pair<unsigned int, boxGeo>>& children, bool isLastInnerNode) {
+Node::Node(unsigned int id, boxGeo boundingBox, multiBoxGeo &children, bool isLastInnerNode) {
     this->id = id;
     this->boundingBox = boundingBox;
     this->children = children;
@@ -326,7 +339,10 @@ Node::Node(unsigned int id, double minX, double minY, double maxX, double maxY, 
 }
 
 void Node::AddChild(Node& child) {
-    this->children.emplace_back(child.GetId(), child.GetBoundingBox());
+    boxGeo box = child.GetBoundingBox();
+    unsigned int entryId = child.GetId();
+    rTreeValue entry = std::make_pair(box, entryId);
+    this->children.push_back(entry);
 }
 
 boxGeo Node::GetBoundingBox() const {
@@ -335,4 +351,34 @@ boxGeo Node::GetBoundingBox() const {
 
 void Node::SetIsLastInnerNode(bool _isLastInnerNode) {
     this->isLastInnerNode = _isLastInnerNode;
+}
+
+bool Node::GetIsLastInnerNode() {
+    return this->isLastInnerNode;
+}
+
+multiBoxGeo Node::GetChildren() {
+    return this->children;
+}
+
+void SaveNode(Node &node, bool isLastInnerNode, const std::string& fileName) {
+    node.SetIsLastInnerNode(isLastInnerNode);
+    std::ofstream outfile(fileName, std::ios::binary);
+    {
+        boost::archive::binary_oarchive archive(outfile);
+        archive << node;
+    }
+    outfile.close();
+}
+
+Node loadNode(const std::string& fileName) {
+    std::ifstream ifs(fileName, std::ios::binary);
+    Node newNode;
+    {
+        boost::archive::binary_iarchive ia(ifs);
+        ia >> newNode;
+    }
+    ifs.close();
+
+    return newNode;
 }
