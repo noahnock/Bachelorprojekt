@@ -59,9 +59,15 @@ public:
 BOOST_CLASS_VERSION(Node, 1)
 
 class Rtree {
+private:
+    std::ofstream nodesOfs;
+    std::ifstream nodesIfs;
+    std::ifstream lookupIfs;
 public:
     void BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder);
     multiBoxGeo SearchTree(boxGeo query, const std::string& folder);
+    int SaveNode(Node &node, bool isLastInnerNode);
+    Node loadNode(unsigned int id);
 };
 
 class ConstructionNode: public Node {
@@ -98,7 +104,9 @@ namespace boost::serialization {
 }
 BOOST_SERIALIZATION_SPLIT_FREE(boxGeo);
 
-void SaveNode(Node &node, bool isLastInnerNode, const std::string& fileName);
-Node loadNode(const std::string& fileName);
+void Test();
+void Test2();
+void Test3();
+void Test4();
 
 #endif //BACHELORPROJEKT_RTREE_H

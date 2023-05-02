@@ -199,7 +199,11 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
 }
 
 void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder) {
+    // prepare the files
     std::filesystem::create_directory(folder);
+    this->nodesOfs = std::ofstream(folder + "/nodes.bin", std::ios::binary);
+    std::map<unsigned int, int> lookup;
+
     // sort the rectangles
     std::vector<multiBoxGeo> orderedInputRectangles;
 
@@ -230,7 +234,8 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
                 Node leafNode = Node(box.second, box.first);
                 currentItem.AddChild(leafNode);
             }
-            SaveNode(currentItem, true, folder + "/id_" + std::to_string(currentItem.GetId()) + ".bin");
+            int nodePtr = SaveNode(currentItem, true);
+            lookup[currentItem.GetId()] = nodePtr;
         } else {
             std::vector<std::vector<multiBoxGeo>> tgsResult = TGSRecursive(currentItem.GetOrderedBoxes(), M, std::ceil(((float) currentItem.GetOrderedBoxes()[0].size()) / ((float) M)));
             for (std::vector<multiBoxGeo>& currentOrderedRectangles : tgsResult) {
@@ -242,13 +247,25 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
                 newId++;
             }
 
-            SaveNode(currentItem, false, folder + "/id_" + std::to_string(currentItem.GetId()) + ".bin");
+            int nodePtr = SaveNode(currentItem, false);
+            lookup[currentItem.GetId()] = nodePtr;
         }
     }
+    this->nodesOfs.close();
+
+    std::ofstream lookupOfs(folder + "/lookup.bin", std::ios::binary);
+    for (unsigned int i = 0; i < newId; i++) {
+        int nodePtr = lookup[i];
+        lookupOfs.write(reinterpret_cast<const char *>(&nodePtr), sizeof(int));
+    }
+    lookupOfs.close();
 }
 
 multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
-    Node rootNode = loadNode(folder + "/id_0.bin");
+    this->lookupIfs = std::ifstream(folder + "/lookup.bin", std::ios::binary);
+    this->nodesIfs = std::ifstream(folder + "/nodes.bin", std::ios::binary);
+
+    Node rootNode = loadNode(0);
     multiBoxGeo results;
     std::stack<Node> nodes;
     nodes.push(rootNode);
@@ -262,13 +279,15 @@ multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
                 if (currentNode.GetIsLastInnerNode()) {
                     results.push_back(child);
                 } else {
-                    Node newNode = loadNode(folder + "/id_" + std::to_string(child.second) + ".bin");
+                    Node newNode = loadNode(child.second);
                     nodes.push(newNode);
                 }
             }
         }
     }
 
+    this->lookupIfs.close();
+    this->nodesIfs.close();
     return results;
 }
 
@@ -361,24 +380,115 @@ multiBoxGeo Node::GetChildren() {
     return this->children;
 }
 
-void SaveNode(Node &node, bool isLastInnerNode, const std::string& fileName) {
+int Rtree::SaveNode(Node &node, bool isLastInnerNode) {
     node.SetIsLastInnerNode(isLastInnerNode);
-    std::ofstream outfile(fileName, std::ios::binary);
-    {
-        boost::archive::binary_oarchive archive(outfile);
-        archive << node;
-    }
+
+    int pos = static_cast<int>(this->nodesOfs.tellp());
+    boost::archive::binary_oarchive archive(this->nodesOfs);
+    archive << node;
+    this->nodesOfs.write(" ", 1);
+
+    return pos;
+}
+
+Node Rtree::loadNode(unsigned int id) {
+    this->lookupIfs.seekg(id * (unsigned int)sizeof(int), std::ios::beg);
+
+    int nodePtr;
+    this->lookupIfs.read(reinterpret_cast<char*>(&nodePtr), sizeof(int));
+
+    Node newNode;
+    this->nodesIfs.seekg(nodePtr);
+    boost::archive::binary_iarchive ia(this->nodesIfs);
+    ia >> newNode;
+
+    return newNode;
+}
+
+void Test() {
+    Node n1 = Node(1, createBoundingBox(1, 1, 2, 2));
+    Node n2 = Node(2, createBoundingBox(3, 3, 4, 4));
+    Node n3 = Node (3, createBoundingBox(5, 5, 6, 6));
+    Node n4 = Node(4, createBoundingBox(7, 7, 8, 8));
+    n1.SetIsLastInnerNode(false);
+    n1.AddChild(n2);
+    n1.AddChild(n3);
+    n2.SetIsLastInnerNode(true);
+    n3.SetIsLastInnerNode(false);
+    n3.AddChild(n4);
+    n4.SetIsLastInnerNode(true);
+
+    int pos = 0;
+
+    std::ofstream outfile("../test.bin", std::ios::binary);
+
+    pos = static_cast<int>(outfile.tellp());
+    std::cout << pos << std::endl;
+    boost::archive::binary_oarchive archive(outfile);
+    archive << n1;
+    outfile.write(" ", 1);
+
+    pos = static_cast<int>(outfile.tellp());
+    std::cout << pos << std::endl;
+    boost::archive::binary_oarchive archive2(outfile);
+    archive2 << n2;
+    outfile.write(" ", 1);
+
+    pos = static_cast<int>(outfile.tellp());
+    std::cout << pos << std::endl;
+    boost::archive::binary_oarchive archive3(outfile);
+    archive3 << n3;
+    outfile.write(" ", 1);
+
+    pos = static_cast<int>(outfile.tellp());
+    std::cout << pos << std::endl;
+    boost::archive::binary_oarchive archive4(outfile);
+    archive4 << n4;
+    outfile.write(" ", 1);
+
     outfile.close();
 }
 
-Node loadNode(const std::string& fileName) {
-    std::ifstream ifs(fileName, std::ios::binary);
-    Node newNode;
-    {
-        boost::archive::binary_iarchive ia(ifs);
-        ia >> newNode;
-    }
+void Test2() {
+    std::ifstream ifs("../test.bin", std::ios::binary);
+
+    Node n1;
+    Node n2;
+    Node n3;
+    Node n4;
+    ifs.seekg(287);
+    boost::archive::binary_iarchive ia(ifs);
+    ia >> n4;
+
     ifs.close();
 
-    return newNode;
+    // 0    182      287         433
+}
+
+void Test3() {
+    std::ofstream ofs("../test_lookup.bin", std::ios::binary);
+    int num = 0;
+    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
+    num = 182;
+    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
+    num = 287;
+    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
+    num = 433;
+    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
+    num = 1000000000;
+    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
+    ofs.close();
+}
+
+void Test4() {
+    std::ifstream ifs("../test_lookup.bin", std::ios::binary);
+
+    ifs.seekg(1 * sizeof(int), std::ios::beg);
+
+    int value;
+    ifs.read(reinterpret_cast<char*>(&value), sizeof(int));
+
+    std::cout << value << std::endl;
+
+    ifs.close();
 }

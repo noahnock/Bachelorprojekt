@@ -496,11 +496,12 @@ void showCase() {
     //Node test_3 = loadNode("../test.bin");
     //tree.BuildTree(boxes, 16, "../100k_new");
     multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../100k_new");
-    std::cout << "Found " << results.size() << " results:" << std::endl;
+    //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(0, 0, 10000, 10000), "../100k_new");
     for(rTreeValue result : results) {
         std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
                   << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
     }
+    std::cout << "Found " << results.size() << " results:" << std::endl;
     //CheckForDuplicateIds(boxes);
 
     auto stopTime = std::chrono::high_resolution_clock::now();
