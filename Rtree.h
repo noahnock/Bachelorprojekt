@@ -20,7 +20,7 @@ namespace bg = boost::geometry;
 
 using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::degree>>;
 using boxGeo = bg::model::box<pointGeo>;
-using rTreeValue = std::pair<boxGeo, unsigned int>;
+using rTreeValue = std::pair<boxGeo, long long>;
 using multiBoxGeo = std::vector<rTreeValue>;
 
 using bg::make;
@@ -28,7 +28,7 @@ using bg::make;
 class Node {
 protected:
     friend class boost::serialization::access;
-    unsigned int id;
+    long long id;
     boxGeo boundingBox;
     bool isLastInnerNode = false;
     multiBoxGeo children;
@@ -41,14 +41,14 @@ protected:
         a & children;
     }
 
-    explicit Node(unsigned int id);
+    explicit Node(long long id);
 
 public:
     Node();
-    Node(unsigned int id, boxGeo boundingBox);
-    Node(unsigned int id, boxGeo boundingBox, multiBoxGeo &children, bool isLastInnerNode);
-    Node(unsigned int id, double minX, double minY, double maxX, double maxY, bool isLastInnerNode);
-    unsigned int GetId() const;
+    Node(long long id, boxGeo boundingBox);
+    Node(long long id, boxGeo boundingBox, multiBoxGeo &children, bool isLastInnerNode);
+    Node(long long id, double minX, double minY, double maxX, double maxY, bool isLastInnerNode);
+    long long GetId() const;
     boxGeo GetBoundingBox() const;
     void AddChild(Node& child);
     void SetIsLastInnerNode(bool isLastInnerNode);
@@ -66,8 +66,8 @@ private:
 public:
     void BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder);
     multiBoxGeo SearchTree(boxGeo query, const std::string& folder);
-    int SaveNode(Node &node, bool isLastInnerNode);
-    Node loadNode(unsigned int id);
+    long long SaveNode(Node &node, bool isLastInnerNode);
+    Node LoadNode(long long id);
 };
 
 class ConstructionNode: public Node {
@@ -75,7 +75,7 @@ private:
     std::vector<multiBoxGeo> orderedBoxes;
 
 public:
-    ConstructionNode(unsigned int id, std::vector<multiBoxGeo> orderedBoxes);
+    ConstructionNode(long long id, std::vector<multiBoxGeo> orderedBoxes);
     std::vector<multiBoxGeo> GetOrderedBoxes();
 };
 
@@ -103,10 +103,5 @@ namespace boost::serialization {
     }
 }
 BOOST_SERIALIZATION_SPLIT_FREE(boxGeo);
-
-void Test();
-void Test2();
-void Test3();
-void Test4();
 
 #endif //BACHELORPROJEKT_RTREE_H

@@ -16,7 +16,7 @@ using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::de
 using polygonGeo = bg::model::polygon<pointGeo>;
 using multiPolygonGeo = bg::model::multi_polygon<polygonGeo>;
 using boxGeo = bg::model::box<pointGeo>;
-using rTreeValue = std::pair<boxGeo, unsigned int>;
+using rTreeValue = std::pair<boxGeo, long long>;
 using multiBoxGeo = std::vector<rTreeValue>;
 using boundingBoxValues = std::vector<std::pair<std::pair<double, double>, std::pair<double, double>>>;
 using bg::append;
@@ -483,7 +483,7 @@ void showCase() {
     //test.saveTGSResult(result, "../germany");
 
     // new tests
-    //multiBoxGeo boxes = test.loadEntries("../data100k.csv");
+    //multiBoxGeo boxes = test.loadEntries("../germany_data_tidy.csv");
     auto startTime = std::chrono::high_resolution_clock::now();
 
     Rtree tree = Rtree();
@@ -494,9 +494,9 @@ void showCase() {
     test_.AddChild(test__2);
     SaveNode(test_, false, "../test.bin");*/
     //Node test_3 = loadNode("../test.bin");
-    //tree.BuildTree(boxes, 16, "../100k_new");
-    multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../100k_new");
-    //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(0, 0, 10000, 10000), "../100k_new");
+    //tree.BuildTree(boxes, 16, "../germany_new"); // took 1716.33 seconds
+    multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany_new");
+    //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(0, 0, 10000, 10000), "../germany_new");
     for(rTreeValue result : results) {
         std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
                   << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;

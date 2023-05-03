@@ -52,7 +52,7 @@ static bool pointWithinBox(pointGeo point, boxGeo box) {
     return point.get<0>() >= box.min_corner().get<0>() && point.get<0>() <= box.max_corner().get<0>() && point.get<1>() >= box.min_corner().get<1>() && point.get<1>() <= box.max_corner().get<1>();
 }
 
-static bool idInMultiBox(unsigned int id, multiBoxGeo& boxes) {
+static bool idInMultiBox(long long id, multiBoxGeo& boxes) {
     for (rTreeValue box : boxes) {
         if (box.second == id) {
             return true;
@@ -73,7 +73,7 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
         std::cout << "Error!" << std::endl;
     }
 
-    size_t n = orderedInputRectangles[0].size();
+    unsigned long long n = orderedInputRectangles[0].size();
 
     if (n <= S) {
         // stop condition
@@ -202,7 +202,7 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
     // prepare the files
     std::filesystem::create_directory(folder);
     this->nodesOfs = std::ofstream(folder + "/nodes.bin", std::ios::binary);
-    std::map<unsigned int, int> lookup;
+    std::map<long long, long long> lookup;
 
     // sort the rectangles
     std::vector<multiBoxGeo> orderedInputRectangles;
@@ -219,7 +219,7 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
     // build the tree in a depth first approach
     std::stack<ConstructionNode> layerStack;
 
-    unsigned int newId = 1; // start from 1, because 0 is the root item
+    long long newId = 1; // start from 1, because 0 is the root item
     ConstructionNode rootItem = ConstructionNode(0, orderedInputRectangles);
     layerStack.push(rootItem);
 
@@ -234,7 +234,7 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
                 Node leafNode = Node(box.second, box.first);
                 currentItem.AddChild(leafNode);
             }
-            int nodePtr = SaveNode(currentItem, true);
+            long long nodePtr = SaveNode(currentItem, true);
             lookup[currentItem.GetId()] = nodePtr;
         } else {
             std::vector<std::vector<multiBoxGeo>> tgsResult = TGSRecursive(currentItem.GetOrderedBoxes(), M, std::ceil(((float) currentItem.GetOrderedBoxes()[0].size()) / ((float) M)));
@@ -247,7 +247,7 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
                 newId++;
             }
 
-            int nodePtr = SaveNode(currentItem, false);
+            long long nodePtr = SaveNode(currentItem, false);
             lookup[currentItem.GetId()] = nodePtr;
         }
     }
@@ -255,8 +255,8 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
 
     std::ofstream lookupOfs(folder + "/lookup.bin", std::ios::binary);
     for (unsigned int i = 0; i < newId; i++) {
-        int nodePtr = lookup[i];
-        lookupOfs.write(reinterpret_cast<const char *>(&nodePtr), sizeof(int));
+        long long nodePtr = lookup[i];
+        lookupOfs.write(reinterpret_cast<const char *>(&nodePtr), sizeof(long long));
     }
     lookupOfs.close();
 }
@@ -265,7 +265,7 @@ multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
     this->lookupIfs = std::ifstream(folder + "/lookup.bin", std::ios::binary);
     this->nodesIfs = std::ifstream(folder + "/nodes.bin", std::ios::binary);
 
-    Node rootNode = loadNode(0);
+    Node rootNode = LoadNode(0);
     multiBoxGeo results;
     std::stack<Node> nodes;
     nodes.push(rootNode);
@@ -279,7 +279,7 @@ multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
                 if (currentNode.GetIsLastInnerNode()) {
                     results.push_back(child);
                 } else {
-                    Node newNode = loadNode(child.second);
+                    Node newNode = LoadNode(child.second);
                     nodes.push(newNode);
                 }
             }
@@ -291,7 +291,7 @@ multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
     return results;
 }
 
-ConstructionNode::ConstructionNode(unsigned int id, std::vector<multiBoxGeo> orderedBoxes)
+ConstructionNode::ConstructionNode(long long id, std::vector<multiBoxGeo> orderedBoxes)
 : Node{id}
 {
     this->orderedBoxes = orderedBoxes;
@@ -325,7 +325,7 @@ ConstructionNode::ConstructionNode(unsigned int id, std::vector<multiBoxGeo> ord
     this->boundingBox = createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
 }
 
-unsigned int Node::GetId() const {
+long long Node::GetId() const {
     return this->id;
 }
 
@@ -333,25 +333,25 @@ std::vector<multiBoxGeo> ConstructionNode::GetOrderedBoxes() {
     return this->orderedBoxes;
 }
 
-Node::Node(unsigned int id, boxGeo boundingBox) {
+Node::Node(long long id, boxGeo boundingBox) {
     this->id = id;
     this->boundingBox = boundingBox;
 }
 
-Node::Node(unsigned int id) {
+Node::Node(long long id) {
     this->id = id;
 }
 
 Node::Node() {}
 
-Node::Node(unsigned int id, boxGeo boundingBox, multiBoxGeo &children, bool isLastInnerNode) {
+Node::Node(long long id, boxGeo boundingBox, multiBoxGeo &children, bool isLastInnerNode) {
     this->id = id;
     this->boundingBox = boundingBox;
     this->children = children;
     this->isLastInnerNode = isLastInnerNode;
 }
 
-Node::Node(unsigned int id, double minX, double minY, double maxX, double maxY, bool isLastInnerNode) {
+Node::Node(long long id, double minX, double minY, double maxX, double maxY, bool isLastInnerNode) {
     this->id = id;
     this->boundingBox = createBoundingBox(minX, minY, maxX, maxY);
     this->isLastInnerNode = isLastInnerNode;
@@ -359,7 +359,7 @@ Node::Node(unsigned int id, double minX, double minY, double maxX, double maxY, 
 
 void Node::AddChild(Node& child) {
     boxGeo box = child.GetBoundingBox();
-    unsigned int entryId = child.GetId();
+    unsigned long long entryId = child.GetId();
     rTreeValue entry = std::make_pair(box, entryId);
     this->children.push_back(entry);
 }
@@ -380,10 +380,10 @@ multiBoxGeo Node::GetChildren() {
     return this->children;
 }
 
-int Rtree::SaveNode(Node &node, bool isLastInnerNode) {
+long long Rtree::SaveNode(Node &node, bool isLastInnerNode) {
     node.SetIsLastInnerNode(isLastInnerNode);
 
-    int pos = static_cast<int>(this->nodesOfs.tellp());
+    long long pos = static_cast<long long>(this->nodesOfs.tellp());
     boost::archive::binary_oarchive archive(this->nodesOfs);
     archive << node;
     this->nodesOfs.write(" ", 1);
@@ -391,104 +391,18 @@ int Rtree::SaveNode(Node &node, bool isLastInnerNode) {
     return pos;
 }
 
-Node Rtree::loadNode(unsigned int id) {
-    this->lookupIfs.seekg(id * (unsigned int)sizeof(int), std::ios::beg);
-
-    int nodePtr;
-    this->lookupIfs.read(reinterpret_cast<char*>(&nodePtr), sizeof(int));
-
+Node Rtree::LoadNode(long long id) {
     Node newNode;
+
+    long long offset = id * (long long)sizeof(long long);
+    this->lookupIfs.seekg(offset, std::ios::beg);
+
+    long long nodePtr;
+    this->lookupIfs.read(reinterpret_cast<char*>(&nodePtr), sizeof(long long));
+
     this->nodesIfs.seekg(nodePtr);
     boost::archive::binary_iarchive ia(this->nodesIfs);
     ia >> newNode;
 
     return newNode;
-}
-
-void Test() {
-    Node n1 = Node(1, createBoundingBox(1, 1, 2, 2));
-    Node n2 = Node(2, createBoundingBox(3, 3, 4, 4));
-    Node n3 = Node (3, createBoundingBox(5, 5, 6, 6));
-    Node n4 = Node(4, createBoundingBox(7, 7, 8, 8));
-    n1.SetIsLastInnerNode(false);
-    n1.AddChild(n2);
-    n1.AddChild(n3);
-    n2.SetIsLastInnerNode(true);
-    n3.SetIsLastInnerNode(false);
-    n3.AddChild(n4);
-    n4.SetIsLastInnerNode(true);
-
-    int pos = 0;
-
-    std::ofstream outfile("../test.bin", std::ios::binary);
-
-    pos = static_cast<int>(outfile.tellp());
-    std::cout << pos << std::endl;
-    boost::archive::binary_oarchive archive(outfile);
-    archive << n1;
-    outfile.write(" ", 1);
-
-    pos = static_cast<int>(outfile.tellp());
-    std::cout << pos << std::endl;
-    boost::archive::binary_oarchive archive2(outfile);
-    archive2 << n2;
-    outfile.write(" ", 1);
-
-    pos = static_cast<int>(outfile.tellp());
-    std::cout << pos << std::endl;
-    boost::archive::binary_oarchive archive3(outfile);
-    archive3 << n3;
-    outfile.write(" ", 1);
-
-    pos = static_cast<int>(outfile.tellp());
-    std::cout << pos << std::endl;
-    boost::archive::binary_oarchive archive4(outfile);
-    archive4 << n4;
-    outfile.write(" ", 1);
-
-    outfile.close();
-}
-
-void Test2() {
-    std::ifstream ifs("../test.bin", std::ios::binary);
-
-    Node n1;
-    Node n2;
-    Node n3;
-    Node n4;
-    ifs.seekg(287);
-    boost::archive::binary_iarchive ia(ifs);
-    ia >> n4;
-
-    ifs.close();
-
-    // 0    182      287         433
-}
-
-void Test3() {
-    std::ofstream ofs("../test_lookup.bin", std::ios::binary);
-    int num = 0;
-    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
-    num = 182;
-    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
-    num = 287;
-    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
-    num = 433;
-    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
-    num = 1000000000;
-    ofs.write(reinterpret_cast<const char *>(&num), sizeof(int));
-    ofs.close();
-}
-
-void Test4() {
-    std::ifstream ifs("../test_lookup.bin", std::ios::binary);
-
-    ifs.seekg(1 * sizeof(int), std::ios::beg);
-
-    int value;
-    ifs.read(reinterpret_cast<char*>(&value), sizeof(int));
-
-    std::cout << value << std::endl;
-
-    ifs.close();
 }
