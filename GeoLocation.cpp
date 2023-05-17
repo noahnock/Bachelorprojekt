@@ -7,7 +7,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include "Rtree.h"
+#include "Rtree/Rtree.h"
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;

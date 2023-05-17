@@ -3,7 +3,7 @@ project(Bachelorprojekt)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(Bachelorprojekt main.cpp Rtree.cpp Rtree.h)
+add_executable(Bachelorprojekt main.cpp Rtree/Rtree.cpp Rtree/Rtree.h)
 
 
 find_package(Boost 1.76 COMPONENTS iostreams program_options REQUIRED)
