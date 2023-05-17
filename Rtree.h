@@ -63,11 +63,16 @@ private:
     std::ofstream nodesOfs;
     std::ifstream nodesIfs;
     std::ifstream lookupIfs;
+    std::ofstream convertOfs;
+    long long SaveNode(Node &node, bool isLastInnerNode);
+    Node LoadNode(long long id);
 public:
     void BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder);
     multiBoxGeo SearchTree(boxGeo query, const std::string& folder);
-    long long SaveNode(Node &node, bool isLastInnerNode);
-    Node LoadNode(long long id);
+    void OpenConversion(const std::string& folder);
+    void CloseConversion();
+    template <typename data_type>
+    void ConvertWordToRtreeEntry(const data_type* data, size_t elementSize, uint64_t index);
 };
 
 class ConstructionNode: public Node {

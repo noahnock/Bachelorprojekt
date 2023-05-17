@@ -406,3 +406,19 @@ Node Rtree::LoadNode(long long id) {
 
     return newNode;
 }
+
+template <typename data_type>
+void Rtree::ConvertWordToRtreeEntry(const data_type* data, size_t elementSize, uint64_t index) {
+    //this->convertOfs.write(data, elementSize * sizeof(data_type));
+    this->convertOfs << data << std::endl;
+}
+
+void Rtree::OpenConversion(const std::string& folder) {
+    std::filesystem::create_directory(folder);
+    //this->convertOfs = std::ofstream(folder + "/converted_data", std::ios::binary);
+    this->convertOfs = std::ofstream(folder + "/converted_data", std::ios_base::app);
+}
+
+void Rtree::CloseConversion() {
+    this->convertOfs.close();
+}
