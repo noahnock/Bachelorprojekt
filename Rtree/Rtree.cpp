@@ -407,18 +407,194 @@ Node Rtree::LoadNode(long long id) {
     return newNode;
 }
 
+std::vector<boxGeo> GetBoundingBoxFromMultiPolygon(const multiPolygonGeo& mPol) {
+    std::vector<boxGeo> boxes(mPol.size());
+
+    for (size_t i = 0; i < mPol.size(); i++) {
+        polygonGeo polygon = mPol[i];
+
+        double minX = -1;
+        double maxX = -1;
+        double minY = -1;
+        double maxY = -1;
+
+        for (auto& p : polygon.outer()) {
+            double x = bg::get<0>(p);
+            double y = bg::get<1>(p);
+
+            if (x < minX || minX == -1) {
+                minX = x;
+            }
+
+            if (x > maxX) {
+                maxX = x;
+            }
+
+            if (y < minY || minY == -1) {
+                minY = y;
+            }
+
+            if (y > maxY) {
+                maxY = y;
+            }
+        }
+
+        boxes[i] = createBoundingBox(minX, minY, maxX, maxY);
+    }
+
+    return boxes;
+}
+
+std::vector<boxGeo> GetBoundingBoxFromPolygon(const polygonGeo& pol) {
+    double minX = -1;
+    double maxX = -1;
+    double minY = -1;
+    double maxY = -1;
+
+    for (auto& p : pol.outer()) {
+        double x = bg::get<0>(p);
+        double y = bg::get<1>(p);
+
+        if (x < minX || minX == -1) {
+            minX = x;
+        }
+
+        if (x > maxX) {
+            maxX = x;
+        }
+
+        if (y < minY || minY == -1) {
+            minY = y;
+        }
+
+        if (y > maxY) {
+            maxY = y;
+        }
+    }
+
+    return std::vector<boxGeo> { createBoundingBox(minX, minY, maxX, maxY) };
+}
+
+std::vector<boxGeo> GetBoundingBoxFromLinestring(const linestringGeo& linestring) {
+    double minX = -1;
+    double maxX = -1;
+    double minY = -1;
+    double maxY = -1;
+
+    for (auto p : linestring) {
+        double x = bg::get<0>(p);
+        double y = bg::get<1>(p);
+
+        if (x < minX || minX == -1) {
+            minX = x;
+        }
+
+        if (x > maxX) {
+            maxX = x;
+        }
+
+        if (y < minY || minY == -1) {
+            minY = y;
+        }
+
+        if (y > maxY) {
+            maxY = y;
+        }
+    }
+
+    return std::vector<boxGeo> { createBoundingBox(minX, minY, maxX, maxY) };
+}
+
 template <typename data_type>
 void Rtree::ConvertWordToRtreeEntry(const data_type* data, size_t elementSize, uint64_t index) {
-    //this->convertOfs.write(data, elementSize * sizeof(data_type));
-    this->convertOfs << data << std::endl;
+    try {
+        auto wkt = static_cast<std::string>(data);
+
+        std::vector<boxGeo> boundingBoxes;
+
+        /* Get the bounding box(es) of either a multipolygon, polygon or a linestring */
+        std::size_t posWKTStart = wkt.find("MULTIPOLYGON(((");
+        std::size_t posWKTEnd = wkt.find(")))") + 2;
+        if (posWKTStart != std::string::npos && posWKTEnd != std::string::npos) {
+            std::string newWkt = wkt.substr(posWKTStart, posWKTEnd - posWKTStart + 1);
+            multiPolygonGeo mPolygon;
+            bg::read_wkt(newWkt, mPolygon);
+            boundingBoxes = GetBoundingBoxFromMultiPolygon(mPolygon);
+        } else {
+            posWKTStart = wkt.find("POLYGON((");
+            posWKTEnd = wkt.find("))") + 1;
+            if (posWKTStart != std::string::npos && posWKTEnd != std::string::npos) {
+                std::string newWkt = wkt.substr(posWKTStart, posWKTEnd - posWKTStart + 1);
+                polygonGeo polygon;
+                bg::read_wkt(newWkt, polygon);
+                boundingBoxes = GetBoundingBoxFromPolygon(polygon);
+            } else {
+                posWKTStart = wkt.find("LINESTRING(");
+                posWKTEnd = wkt.find(')');
+                if (posWKTStart != std::string::npos && posWKTEnd != std::string::npos) {
+                    std::string newWkt = wkt.substr(posWKTStart, posWKTEnd - posWKTStart + 1);
+                    linestringGeo linestring;
+                    bg::read_wkt(newWkt, linestring);
+                    boundingBoxes = GetBoundingBoxFromLinestring(linestring);
+                } else {
+                    return;
+                }
+            }
+        }
+
+        /* write the boundingbox value to file */
+        for (boxGeo box : boundingBoxes) {
+            double minX = box.min_corner().get<0>();
+            double minY = box.min_corner().get<1>();
+            double maxX = box.max_corner().get<0>();
+            double maxY = box.max_corner().get<1>();
+
+            this->convertOfs.write(reinterpret_cast<const char *>(&minX), sizeof(double));
+            this->convertOfs.write(reinterpret_cast<const char *>(&minY), sizeof(double));
+            this->convertOfs.write(reinterpret_cast<const char *>(&maxX), sizeof(double));
+            this->convertOfs.write(reinterpret_cast<const char *>(&maxY), sizeof(double));
+            this->convertOfs.write(reinterpret_cast<const char *>(&index), sizeof(uint64_t));
+        }
+    } catch (...){
+        return;
+    }
 }
 
 void Rtree::OpenConversion(const std::string& folder) {
     std::filesystem::create_directory(folder);
-    //this->convertOfs = std::ofstream(folder + "/converted_data", std::ios::binary);
-    this->convertOfs = std::ofstream(folder + "/converted_data", std::ios_base::app);
+    this->convertOfs = std::ofstream(folder + "/converted_data.bin", std::ios::binary);
 }
 
 void Rtree::CloseConversion() {
     this->convertOfs.close();
+}
+
+multiBoxGeo Rtree::LoadEntries(const std::string& folder) {
+    multiBoxGeo boxes;
+
+    this->loadEntriesIfs = std::ifstream(folder + "/converted_data.bin", std::ios::binary);
+    this->loadEntriesIfs.seekg (0, this->loadEntriesIfs.end);
+    long long fileLength = this->loadEntriesIfs.tellg();
+    this->loadEntriesIfs.seekg (0, this->loadEntriesIfs.beg);
+
+    double minX;
+    double minY;
+    double maxX;
+    double maxY;
+    uint64_t id;
+
+    while (this->loadEntriesIfs.tellg() < fileLength) {
+        this->loadEntriesIfs.read(reinterpret_cast<char*>(&minX), sizeof(double));
+        this->loadEntriesIfs.read(reinterpret_cast<char*>(&minY), sizeof(double));
+        this->loadEntriesIfs.read(reinterpret_cast<char*>(&maxX), sizeof(double));
+        this->loadEntriesIfs.read(reinterpret_cast<char*>(&maxY), sizeof(double));
+        this->loadEntriesIfs.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
+
+        boxGeo box = createBoundingBox(minX, minY, maxX, maxY);
+        rTreeValue boxWithId = std::make_pair(box, id);
+        boxes.push_back(boxWithId);
+    }
+
+    this->loadEntriesIfs.close();
+    return boxes;
 }

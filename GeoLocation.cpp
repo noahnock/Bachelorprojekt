@@ -426,6 +426,20 @@ public:
         }
 
     }
+
+    /*static void TestConverter(Rtree& tree, const std::string& path) {
+        std::ifstream infile(path);
+        tree.OpenConversion("../conversion_test");
+        size_t lineCount = 0;
+
+        for (std::string line; std::getline(infile, line);)
+        {
+            tree.ConvertWordToRtreeEntry(line, 0, lineCount);
+            lineCount++;
+        }
+
+        tree.CloseConversion();
+    }*/
 };
 
 void CheckForDuplicateIds(multiBoxGeo& boxes) {
@@ -495,14 +509,22 @@ void showCase() {
     SaveNode(test_, false, "../test.bin");*/
     //Node test_3 = loadNode("../test.bin");
     //tree.BuildTree(boxes, 16, "../germany_new"); // took 1716.33 seconds
-    multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany_new");
+    //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany_new");
     //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(0, 0, 10000, 10000), "../germany_new");
+    /*for(rTreeValue result : results) {
+        std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
+                  << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
+    }
+    std::cout << "Found " << results.size() << " results:" << std::endl;*/
+    //CheckForDuplicateIds(boxes);
+
+    //test.TestConverter(tree, "../osm-germany-100k.tsv");
+    /*multiBoxGeo results = tree.LoadEntries("../conversion_test");
     for(rTreeValue result : results) {
         std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
                   << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
     }
-    std::cout << "Found " << results.size() << " results:" << std::endl;
-    //CheckForDuplicateIds(boxes);
+    std::cout << "Found " << results.size() << " results:" << std::endl;*/
 
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);

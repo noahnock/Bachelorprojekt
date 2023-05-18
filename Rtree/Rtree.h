@@ -22,6 +22,9 @@ using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::de
 using boxGeo = bg::model::box<pointGeo>;
 using rTreeValue = std::pair<boxGeo, long long>;
 using multiBoxGeo = std::vector<rTreeValue>;
+using polygonGeo = bg::model::polygon<pointGeo>;
+using multiPolygonGeo = bg::model::multi_polygon<polygonGeo>;
+using linestringGeo = bg::model::linestring<pointGeo>;
 
 using bg::make;
 
@@ -64,6 +67,7 @@ private:
     std::ifstream nodesIfs;
     std::ifstream lookupIfs;
     std::ofstream convertOfs;
+    std::ifstream loadEntriesIfs;
     long long SaveNode(Node &node, bool isLastInnerNode);
     Node LoadNode(long long id);
 public:
@@ -73,6 +77,7 @@ public:
     void CloseConversion();
     template <typename data_type>
     void ConvertWordToRtreeEntry(const data_type* data, size_t elementSize, uint64_t index);
+    multiBoxGeo LoadEntries(const std::string& folder);
 };
 
 class ConstructionNode: public Node {
