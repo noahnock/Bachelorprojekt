@@ -3,7 +3,15 @@ project(Bachelorprojekt)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(Bachelorprojekt main.cpp Rtree/Rtree.h Rtree/Rtree.cpp)
+add_library(rtree Rtree/Rtree.cpp)
+target_link_libraries(rtree Boost::serialization Boost::program_options Boost::iostreams)
+
+add_executable(Bachelorprojekt main.cpp)
+target_link_libraries(Bachelorprojekt ${Boost_LIBRARIES} Boost::serialization Boost::program_options Boost::iostreams rtree)
+
+
+find_package(Boost 1.76 COMPONENTS iostreams serialization program_options REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
 
 
 #find_package(Boost 1.76 COMPONENTS iostreams program_options REQUIRED)
@@ -37,7 +45,7 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
 
 #set(Boost_INCLUDE_DIR /Users/noahs-mbp/developing/Boost/installation/include)
 #set(Boost_LIBRARY_DIR /Users/noahs-mbp/developing/Boost/installation/lib)
-find_package(Boost COMPONENTS serialization iostreams program_options REQUIRED)
-include_directories(${Boost_INCLUDE_DIR})
-link_directories(${Boost_LIBRARY_DIR})
-target_link_libraries(Bachelorprojekt ${Boost_LIBRARIES})
+#find_package(Boost COMPONENTS serialization iostreams program_options REQUIRED)
+#include_directories(${Boost_INCLUDE_DIR})
+#link_directories(${Boost_LIBRARY_DIR})
+#target_link_libraries(Bachelorprojekt ${Boost_LIBRARIES})
