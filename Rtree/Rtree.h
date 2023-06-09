@@ -1,14 +1,15 @@
-//
-// Created by Noah on 19.04.23.
-//
+//  Copyright 2023, University of Freiburg,
+//                  Chair of Algorithms and Data Structures.
+//  Author: Noah Nock <noah.v.nock@gmail.com>
 
 #ifndef BACHELORPROJEKT_RTREE_H
 #define BACHELORPROJEKT_RTREE_H
 
-#include <boost/geometry.hpp>
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <filesystem>
+#include <boost/geometry.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/serialization/vector.hpp>
@@ -37,7 +38,7 @@ protected:
     multiBoxGeo children;
 
     template<class Archive>
-    void serialize(Archive & a, const unsigned int version) {
+    void serialize(Archive & a, [[maybe_unused]]const unsigned int version) {
         a & id;
         a & isLastInnerNode;
         a & boundingBox;
@@ -63,21 +64,14 @@ BOOST_CLASS_VERSION(Node, 1)
 
 class Rtree {
 private:
-    std::ofstream nodesOfs;
-    std::ifstream nodesIfs;
-    std::ifstream lookupIfs;
-    std::ofstream convertOfs;
-    std::ifstream loadEntriesIfs;
-    long long SaveNode(Node &node, bool isLastInnerNode);
-    Node LoadNode(long long id);
+    long long SaveNode(Node &node, bool isLastInnerNode, std::ofstream& nodesOfs);
+    Node LoadNode(long long id, std::ifstream& lookupIfs, std::ifstream& nodesIfs);
 public:
     void BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder);
     multiBoxGeo SearchTree(boxGeo query, const std::string& folder);
-    void OpenConversion(const std::string& folder);
-    void CloseConversion();
-    template <typename data_type>
-    void ConvertWordToRtreeEntry(const data_type* data, size_t elementSize, uint64_t index);
+    static void ConvertWordToRtreeEntry(const std::string& wkt, uint64_t index, const std::string& folder);
     multiBoxGeo LoadEntries(const std::string& folder);
+    static boxGeo createBoundingBox(double pointOneX, double pointOneY, double pointTwoX, double pointTwoY);
 };
 
 class ConstructionNode: public Node {
@@ -91,7 +85,7 @@ public:
 
 namespace boost::serialization {
     template<class Archive>
-    void save(Archive & a, const boxGeo & b, unsigned int version)
+    void save(Archive & a, const boxGeo & b, [[maybe_unused]]unsigned int version)
     {
         a << b.min_corner().get<0>();
         a << b.min_corner().get<1>();
@@ -99,7 +93,7 @@ namespace boost::serialization {
         a << b.max_corner().get<1>();
     }
     template<class Archive>
-    void load(Archive & a, boxGeo & b, unsigned int version)
+    void load(Archive & a, boxGeo & b, [[maybe_unused]]unsigned int version)
     {
         double minX = 0;
         a >> minX;

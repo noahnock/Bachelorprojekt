@@ -8,6 +8,7 @@
 #include <fstream>
 #include <vector>
 #include "Rtree/Rtree.h"
+#include <filesystem>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -442,7 +443,7 @@ public:
     }*/
 };
 
-void CheckForDuplicateIds(multiBoxGeo& boxes) {
+/*void CheckForDuplicateIds(multiBoxGeo& boxes) {
     std::vector<unsigned int> cache;
     int i = 0;
     for (rTreeValue box : boxes) {
@@ -457,7 +458,7 @@ void CheckForDuplicateIds(multiBoxGeo& boxes) {
         cache.push_back(box.second);
     }
     std::cout << "Found " << i << " duplicates" << std::endl;
-}
+}*/
 
 void showCase() {
     GeoLocation test;
@@ -510,12 +511,12 @@ void showCase() {
     //Node test_3 = loadNode("../test.bin");
     //tree.BuildTree(boxes, 16, "../germany_new"); // took 1716.33 seconds
     //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany_new");
-    //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(0, 0, 10000, 10000), "../germany_new");
-    /*for(rTreeValue result : results) {
+    multiBoxGeo results = tree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland");
+    for(rTreeValue result : results) {
         std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
                   << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
     }
-    std::cout << "Found " << results.size() << " results:" << std::endl;*/
+    std::cout << "Found " << results.size() << " results:" << std::endl;
     //CheckForDuplicateIds(boxes);
 
     //test.TestConverter(tree, "../osm-germany-100k.tsv");

@@ -1,14 +1,14 @@
-//
-// Created by Noah on 19.04.23.
-//
+//  Copyright 2023, University of Freiburg,
+//                  Chair of Algorithms and Data Structures.
+//  Author: Noah Nock <noah.v.nock@gmail.com>
 
 #include "Rtree.h"
 
 bool intersects(const boxGeo &b1, const boxGeo &b2) {
     bool notIntersecting = b1.min_corner().get<0>() > b2.max_corner().get<0>() ||
-                         b2.min_corner().get<0>() > b1.max_corner().get<0>() ||
-                         b1.min_corner().get<1>() > b2.max_corner().get<1>() ||
-                         b2.min_corner().get<1>() > b1.max_corner().get<1>();
+                           b2.min_corner().get<0>() > b1.max_corner().get<0>() ||
+                           b1.min_corner().get<1>() > b2.max_corner().get<1>() ||
+                           b2.min_corner().get<1>() > b1.max_corner().get<1>();
 
     return !notIntersecting;
 }
@@ -52,16 +52,21 @@ static bool pointWithinBox(pointGeo point, boxGeo box) {
     return point.get<0>() >= box.min_corner().get<0>() && point.get<0>() <= box.max_corner().get<0>() && point.get<1>() >= box.min_corner().get<1>() && point.get<1>() <= box.max_corner().get<1>();
 }
 
-static bool idInMultiBox(long long id, multiBoxGeo& boxes) {
-    for (rTreeValue box : boxes) {
-        if (box.second == id) {
+static bool boxInMultiBox(rTreeValue& item, multiBoxGeo& boxes) {
+    for (rTreeValue currentItem : boxes) {
+        boxGeo currentBox = currentItem.first;
+        boxGeo box = item.first;
+        if (currentItem.second == item.second && box.min_corner().get<0>() == currentBox.min_corner().get<0>()
+            && box.min_corner().get<1>() == currentBox.min_corner().get<1>()
+            && box.max_corner().get<0>() == currentBox.max_corner().get<0>()
+            && box.max_corner().get<1>() == currentBox.max_corner().get<1>()) {
             return true;
         }
     }
     return false;
 }
 
-static boxGeo createBoundingBox(double pointOneX, double pointOneY, double pointTwoX, double pointTwoY) {
+boxGeo Rtree::createBoundingBox(double pointOneX, double pointOneY, double pointTwoX, double pointTwoY) {
     return make<boxGeo>(make<pointGeo>(pointOneX, pointOneY), make<pointGeo>(pointTwoX, pointTwoY));
 }
 
@@ -83,7 +88,7 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
     double bestCost = -1;
     size_t bestDim = 0;
     unsigned long bestI = 1;
-    boxGeo bestB0 = createBoundingBox(0, 0, 0, 0);
+    boxGeo bestB0 = Rtree::createBoundingBox(0, 0, 0, 0);
 
     for (size_t dim = 0; dim <= 1; dim++) {
         for (size_t i = 1; i < std::ceil(((float) n) / ((float) S)); i++) {
@@ -112,8 +117,8 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
                 maxYB1 = (orderedInputRectangles[dim][orderedInputRectangles[dim].size() - 1].first.min_corner().get<1>() + orderedInputRectangles[dim][orderedInputRectangles[dim].size() - 1].first.max_corner().get<1>()) / 2;
             }
 
-            boxGeo b0 = createBoundingBox(minXB0, minYB0, maxXB0, maxYB0);
-            boxGeo b1 = createBoundingBox(minXB1, minYB1, maxXB1, maxYB1);
+            boxGeo b0 = Rtree::createBoundingBox(minXB0, minYB0, maxXB0, maxYB0);
+            boxGeo b1 = Rtree::createBoundingBox(minXB1, minYB1, maxXB1, maxYB1);
 
 
             double cost = costFunctionTGS(b0, b1);
@@ -142,7 +147,7 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
         if (bestDim == 0) {
             boxCenter = make<pointGeo>((box.first.min_corner().get<0>() + box.first.max_corner().get<0>()) / 2, 0.5);
             if (boxCenter.get<0>() == bestB0.max_corner().get<0>()) {
-                if (idInMultiBox(box.second, s0BestDim)) {
+                if (boxInMultiBox(box, s0BestDim)) {
                     s0OtherDim.push_back(box);
                 } else {
                     s1OtherDim.push_back(box);
@@ -152,7 +157,7 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
         } else {
             boxCenter = make<pointGeo>(0.5, (box.first.min_corner().get<1>() + box.first.max_corner().get<1>()) / 2);
             if (boxCenter.get<1>() == bestB0.max_corner().get<1>()) {
-                if (idInMultiBox(box.second, s0BestDim)) {
+                if (boxInMultiBox(box, s0BestDim)) {
                     s0OtherDim.push_back(box);
                 } else {
                     s1OtherDim.push_back(box);
@@ -201,7 +206,7 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
 void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder) {
     // prepare the files
     std::filesystem::create_directory(folder);
-    this->nodesOfs = std::ofstream(folder + "/nodes.bin", std::ios::binary);
+    std::ofstream nodesOfs = std::ofstream(folder + "/nodes.bin", std::ios::binary);
     std::map<long long, long long> lookup;
 
     // sort the rectangles
@@ -234,7 +239,7 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
                 Node leafNode = Node(box.second, box.first);
                 currentItem.AddChild(leafNode);
             }
-            long long nodePtr = SaveNode(currentItem, true);
+            long long nodePtr = SaveNode(currentItem, true, nodesOfs);
             lookup[currentItem.GetId()] = nodePtr;
         } else {
             std::vector<std::vector<multiBoxGeo>> tgsResult = TGSRecursive(currentItem.GetOrderedBoxes(), M, std::ceil(((float) currentItem.GetOrderedBoxes()[0].size()) / ((float) M)));
@@ -247,11 +252,11 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
                 newId++;
             }
 
-            long long nodePtr = SaveNode(currentItem, false);
+            long long nodePtr = SaveNode(currentItem, false, nodesOfs);
             lookup[currentItem.GetId()] = nodePtr;
         }
     }
-    this->nodesOfs.close();
+    nodesOfs.close();
 
     std::ofstream lookupOfs(folder + "/lookup.bin", std::ios::binary);
     for (unsigned int i = 0; i < newId; i++) {
@@ -262,10 +267,10 @@ void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string&
 }
 
 multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
-    this->lookupIfs = std::ifstream(folder + "/lookup.bin", std::ios::binary);
-    this->nodesIfs = std::ifstream(folder + "/nodes.bin", std::ios::binary);
+    std::ifstream lookupIfs = std::ifstream(folder + "/lookup.bin", std::ios::binary);
+    std::ifstream nodesIfs = std::ifstream(folder + "/nodes.bin", std::ios::binary);
 
-    Node rootNode = LoadNode(0);
+    Node rootNode = LoadNode(0, lookupIfs, nodesIfs);
     multiBoxGeo results;
     std::stack<Node> nodes;
     nodes.push(rootNode);
@@ -279,20 +284,20 @@ multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
                 if (currentNode.GetIsLastInnerNode()) {
                     results.push_back(child);
                 } else {
-                    Node newNode = LoadNode(child.second);
+                    Node newNode = LoadNode(child.second, lookupIfs, nodesIfs);
                     nodes.push(newNode);
                 }
             }
         }
     }
 
-    this->lookupIfs.close();
-    this->nodesIfs.close();
+    lookupIfs.close();
+    nodesIfs.close();
     return results;
 }
 
 ConstructionNode::ConstructionNode(long long id, std::vector<multiBoxGeo> orderedBoxes)
-: Node{id}
+        : Node{id}
 {
     this->orderedBoxes = orderedBoxes;
 
@@ -322,7 +327,7 @@ ConstructionNode::ConstructionNode(long long id, std::vector<multiBoxGeo> ordere
         }
     }
 
-    this->boundingBox = createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
+    this->boundingBox = Rtree::createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
 }
 
 long long Node::GetId() const {
@@ -353,7 +358,7 @@ Node::Node(long long id, boxGeo boundingBox, multiBoxGeo &children, bool isLastI
 
 Node::Node(long long id, double minX, double minY, double maxX, double maxY, bool isLastInnerNode) {
     this->id = id;
-    this->boundingBox = createBoundingBox(minX, minY, maxX, maxY);
+    this->boundingBox = Rtree::createBoundingBox(minX, minY, maxX, maxY);
     this->isLastInnerNode = isLastInnerNode;
 }
 
@@ -380,28 +385,28 @@ multiBoxGeo Node::GetChildren() {
     return this->children;
 }
 
-long long Rtree::SaveNode(Node &node, bool isLastInnerNode) {
+long long Rtree::SaveNode(Node &node, bool isLastInnerNode, std::ofstream& nodesOfs) {
     node.SetIsLastInnerNode(isLastInnerNode);
 
-    long long pos = static_cast<long long>(this->nodesOfs.tellp());
-    boost::archive::binary_oarchive archive(this->nodesOfs);
+    long long pos = static_cast<long long>(nodesOfs.tellp());
+    boost::archive::binary_oarchive archive(nodesOfs);
     archive << node;
-    this->nodesOfs.write(" ", 1);
+    nodesOfs.write(" ", 1);
 
     return pos;
 }
 
-Node Rtree::LoadNode(long long id) {
+Node Rtree::LoadNode(long long id, std::ifstream& lookupIfs, std::ifstream& nodesIfs) {
     Node newNode;
 
     long long offset = id * (long long)sizeof(long long);
-    this->lookupIfs.seekg(offset, std::ios::beg);
+    lookupIfs.seekg(offset, std::ios::beg);
 
     long long nodePtr;
-    this->lookupIfs.read(reinterpret_cast<char*>(&nodePtr), sizeof(long long));
+    lookupIfs.read(reinterpret_cast<char*>(&nodePtr), sizeof(long long));
 
-    this->nodesIfs.seekg(nodePtr);
-    boost::archive::binary_iarchive ia(this->nodesIfs);
+    nodesIfs.seekg(nodePtr);
+    boost::archive::binary_iarchive ia(nodesIfs);
     ia >> newNode;
 
     return newNode;
@@ -439,7 +444,7 @@ std::vector<boxGeo> GetBoundingBoxFromMultiPolygon(const multiPolygonGeo& mPol) 
             }
         }
 
-        boxes[i] = createBoundingBox(minX, minY, maxX, maxY);
+        boxes[i] = Rtree::createBoundingBox(minX, minY, maxX, maxY);
     }
 
     return boxes;
@@ -472,7 +477,7 @@ std::vector<boxGeo> GetBoundingBoxFromPolygon(const polygonGeo& pol) {
         }
     }
 
-    return std::vector<boxGeo> { createBoundingBox(minX, minY, maxX, maxY) };
+    return std::vector<boxGeo> { Rtree::createBoundingBox(minX, minY, maxX, maxY) };
 }
 
 std::vector<boxGeo> GetBoundingBoxFromLinestring(const linestringGeo& linestring) {
@@ -502,14 +507,13 @@ std::vector<boxGeo> GetBoundingBoxFromLinestring(const linestringGeo& linestring
         }
     }
 
-    return std::vector<boxGeo> { createBoundingBox(minX, minY, maxX, maxY) };
+    return std::vector<boxGeo> { Rtree::createBoundingBox(minX, minY, maxX, maxY) };
 }
 
-template <typename data_type>
-void Rtree::ConvertWordToRtreeEntry(const data_type* data, size_t elementSize, uint64_t index) {
+void Rtree::ConvertWordToRtreeEntry(const std::string& wkt, uint64_t index, const std::string& folder) {
+    std::filesystem::create_directory(folder);
+    std::ofstream convertOfs = std::ofstream(folder + "/converted_data.bin", std::ios::binary | std::ios_base::app);
     try {
-        auto wkt = static_cast<std::string>(data);
-
         std::vector<boxGeo> boundingBoxes;
 
         /* Get the bounding box(es) of either a multipolygon, polygon or a linestring */
@@ -549,33 +553,26 @@ void Rtree::ConvertWordToRtreeEntry(const data_type* data, size_t elementSize, u
             double maxX = box.max_corner().get<0>();
             double maxY = box.max_corner().get<1>();
 
-            this->convertOfs.write(reinterpret_cast<const char *>(&minX), sizeof(double));
-            this->convertOfs.write(reinterpret_cast<const char *>(&minY), sizeof(double));
-            this->convertOfs.write(reinterpret_cast<const char *>(&maxX), sizeof(double));
-            this->convertOfs.write(reinterpret_cast<const char *>(&maxY), sizeof(double));
-            this->convertOfs.write(reinterpret_cast<const char *>(&index), sizeof(uint64_t));
+            convertOfs.write(reinterpret_cast<const char *>(&minX), sizeof(double));
+            convertOfs.write(reinterpret_cast<const char *>(&minY), sizeof(double));
+            convertOfs.write(reinterpret_cast<const char *>(&maxX), sizeof(double));
+            convertOfs.write(reinterpret_cast<const char *>(&maxY), sizeof(double));
+            convertOfs.write(reinterpret_cast<const char *>(&index), sizeof(uint64_t));
         }
     } catch (...){
+        convertOfs.close();
         return;
     }
-}
-
-void Rtree::OpenConversion(const std::string& folder) {
-    std::filesystem::create_directory(folder);
-    this->convertOfs = std::ofstream(folder + "/converted_data.bin", std::ios::binary);
-}
-
-void Rtree::CloseConversion() {
-    this->convertOfs.close();
+    convertOfs.close();
 }
 
 multiBoxGeo Rtree::LoadEntries(const std::string& folder) {
     multiBoxGeo boxes;
 
-    this->loadEntriesIfs = std::ifstream(folder + "/converted_data.bin", std::ios::binary);
-    this->loadEntriesIfs.seekg (0, this->loadEntriesIfs.end);
-    long long fileLength = this->loadEntriesIfs.tellg();
-    this->loadEntriesIfs.seekg (0, this->loadEntriesIfs.beg);
+    std::ifstream loadEntriesIfs = std::ifstream(folder + "/converted_data.bin", std::ios::binary);
+    loadEntriesIfs.seekg (0, loadEntriesIfs.end);
+    long long fileLength = loadEntriesIfs.tellg();
+    loadEntriesIfs.seekg (0, loadEntriesIfs.beg);
 
     double minX;
     double minY;
@@ -583,18 +580,18 @@ multiBoxGeo Rtree::LoadEntries(const std::string& folder) {
     double maxY;
     uint64_t id;
 
-    while (this->loadEntriesIfs.tellg() < fileLength) {
-        this->loadEntriesIfs.read(reinterpret_cast<char*>(&minX), sizeof(double));
-        this->loadEntriesIfs.read(reinterpret_cast<char*>(&minY), sizeof(double));
-        this->loadEntriesIfs.read(reinterpret_cast<char*>(&maxX), sizeof(double));
-        this->loadEntriesIfs.read(reinterpret_cast<char*>(&maxY), sizeof(double));
-        this->loadEntriesIfs.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
+    while (loadEntriesIfs.tellg() < fileLength) {
+        loadEntriesIfs.read(reinterpret_cast<char*>(&minX), sizeof(double));
+        loadEntriesIfs.read(reinterpret_cast<char*>(&minY), sizeof(double));
+        loadEntriesIfs.read(reinterpret_cast<char*>(&maxX), sizeof(double));
+        loadEntriesIfs.read(reinterpret_cast<char*>(&maxY), sizeof(double));
+        loadEntriesIfs.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
 
         boxGeo box = createBoundingBox(minX, minY, maxX, maxY);
         rTreeValue boxWithId = std::make_pair(box, id);
         boxes.push_back(boxWithId);
     }
 
-    this->loadEntriesIfs.close();
+    loadEntriesIfs.close();
     return boxes;
 }

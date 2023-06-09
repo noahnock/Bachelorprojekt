@@ -13,10 +13,6 @@ target_link_libraries(Bachelorprojekt ${Boost_LIBRARIES} Boost::serialization Bo
 find_package(Boost 1.76 COMPONENTS iostreams serialization program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
-
-#find_package(Boost 1.76 COMPONENTS iostreams program_options REQUIRED)
-#include_directories(${Boost_INCLUDE_DIR})
-
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -42,10 +38,3 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
-
-#set(Boost_INCLUDE_DIR /Users/noahs-mbp/developing/Boost/installation/include)
-#set(Boost_LIBRARY_DIR /Users/noahs-mbp/developing/Boost/installation/lib)
-#find_package(Boost COMPONENTS serialization iostreams program_options REQUIRED)
-#include_directories(${Boost_INCLUDE_DIR})
-#link_directories(${Boost_LIBRARY_DIR})
-#target_link_libraries(Bachelorprojekt ${Boost_LIBRARIES})
