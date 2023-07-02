@@ -9,6 +9,7 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <optional>
 #include <boost/geometry.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
@@ -23,9 +24,9 @@ using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::de
 using boxGeo = bg::model::box<pointGeo>;
 using rTreeValue = std::pair<boxGeo, long long>;
 using multiBoxGeo = std::vector<rTreeValue>;
-using polygonGeo = bg::model::polygon<pointGeo>;
+/*using polygonGeo = bg::model::polygon<pointGeo>;
 using multiPolygonGeo = bg::model::multi_polygon<polygonGeo>;
-using linestringGeo = bg::model::linestring<pointGeo>;
+using linestringGeo = bg::model::linestring<pointGeo>;*/
 
 using bg::make;
 
@@ -69,8 +70,9 @@ private:
 public:
     void BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder);
     multiBoxGeo SearchTree(boxGeo query, const std::string& folder);
-    static void ConvertWordToRtreeEntry(const std::string& wkt, uint64_t index, const std::string& folder);
-    multiBoxGeo LoadEntries(const std::string& folder);
+    static std::optional<boxGeo> ConvertWordToRtreeEntry(const std::string& wkt);
+    static void SaveEntries(boxGeo boundingBox, uint64_t index, std::ofstream& convertOfs);
+    multiBoxGeo LoadEntries(const std::string& file);
     static boxGeo createBoundingBox(double pointOneX, double pointOneY, double pointTwoX, double pointTwoY);
 };
 

@@ -9,6 +9,7 @@
 #include <vector>
 #include "Rtree/Rtree.h"
 #include <filesystem>
+#include <regex>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -430,7 +431,7 @@ public:
 
     /*static void TestConverter(Rtree& tree, const std::string& path) {
         std::ifstream infile(path);
-        tree.OpenConversion("../conversion_test");
+        tree.OpenConversion("../conversion_test_old");
         size_t lineCount = 0;
 
         for (std::string line; std::getline(infile, line);)
@@ -509,23 +510,75 @@ void showCase() {
     test_.AddChild(test__2);
     SaveNode(test_, false, "../test.bin");*/
     //Node test_3 = loadNode("../test.bin");
-    //tree.BuildTree(boxes, 16, "../germany_new"); // took 1716.33 seconds
+    /*multiBoxGeo boxes = tree.LoadEntries("../switzerland_raw");
+    auto stopTime_ = std::chrono::high_resolution_clock::now();
+    auto duration_ = std::chrono::duration_cast<std::chrono::microseconds>(stopTime_ - startTime_);
+    std::cout << "Loaded in " << duration_.count() / 1000000.0 << " seconds" << std::endl;
+    auto startTime = std::chrono::high_resolution_clock::now();
+    tree.BuildTree(boxes, 16, "../switzerland_raw/rtree_build"); // took 1716.33 seconds for germany */
     //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany_new");
-    multiBoxGeo results = tree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland");
-    for(rTreeValue result : results) {
-        std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
-                  << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
-    }
-    std::cout << "Found " << results.size() << " results:" << std::endl;
-    //CheckForDuplicateIds(boxes);
-
-    //test.TestConverter(tree, "../osm-germany-100k.tsv");
-    /*multiBoxGeo results = tree.LoadEntries("../conversion_test");
+    /*multiBoxGeo results = tree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland");
     for(rTreeValue result : results) {
         std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
                   << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
     }
     std::cout << "Found " << results.size() << " results:" << std::endl;*/
+    //CheckForDuplicateIds(boxes);
+
+    //test.TestConverter(tree, "../osm-germany-100k.tsv");
+    /*multiBoxGeo results = tree.LoadEntries("../conversion_test_old");
+    for(rTreeValue result : results) {
+        std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
+                  << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
+    }
+    std::cout << "Found " << results.size() << " results:" << std::endl;*/
+
+    std::ifstream infile("../switzerland_raw/switzerland_raw.txt");
+    //std::filesystem::create_directory("../switzerland_raw");
+    std::ofstream convertOfs = std::ofstream("../switzerland_raw/test", std::ios::binary);
+
+    std::cout << "Loading" << std::endl;
+
+    long long id = 1;
+    for (std::string line; std::getline(infile, line);)
+    {
+        std::optional<boxGeo> boundingBox = Rtree::ConvertWordToRtreeEntry(line);
+        if (boundingBox) {
+            Rtree::SaveEntries(boundingBox.value(), id, convertOfs);
+        }
+        id++;
+    }
+
+    convertOfs.close();
+
+    std::cout << "Loaded entries" << std::endl;
+    std::cout << "Building Rtree" << std::endl;
+
+    Rtree rtree = Rtree();
+    multiBoxGeo entries = rtree.LoadEntries("../switzerland_raw/test");
+    rtree.BuildTree(entries, 16, "../switzerland_raw/rtree_build");
+
+    std::cout << "Finished building the Rtree with " << entries.size() << " entries" << std::endl;
+
+    //std::cout << tree.time << std::endl;
+
+
+    // 2.46108
+    // 6.6e-05
+    // 0.003989
+    // 3.536
+    // 1.45942
+
+    // 0.000134 for string search
+    // 0.000277 for substring
+    // 1.47477 for wkt parsing
+
+    /*polygonGeo polygon;
+    bg::read_wkt("POLYGON((1 1, 1 10, 10 10, 10 1, 1 1),(2 2,9 2,9 9,2 9,2 2))", polygon);
+    //bg::read_wkt("POLYGON ((35 10, 45 45, 15 40, 10 20, 35 10),(20 30, 35 35, 30 20, 20 30))", polygon);
+    //bg::correct(polygon);
+    std::cout << bg::wkt(polygon) << std::endl;
+    std::cout << (bg::is_valid(polygon) ? "valid" : "invalid") << std::endl;*/
 
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
