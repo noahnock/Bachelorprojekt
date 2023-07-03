@@ -67,13 +67,15 @@ class Rtree {
 private:
     long long SaveNode(Node &node, bool isLastInnerNode, std::ofstream& nodesOfs);
     Node LoadNode(long long id, std::ifstream& lookupIfs, std::ifstream& nodesIfs);
+    uintmax_t maxBuildingRamUsage;
 public:
-    void BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder);
+    void BuildTree(const std::string& onDiskBase, size_t M, const std::string& folder);
     multiBoxGeo SearchTree(boxGeo query, const std::string& folder);
     static std::optional<boxGeo> ConvertWordToRtreeEntry(const std::string& wkt);
-    static void SaveEntries(boxGeo boundingBox, uint64_t index, std::ofstream& convertOfs);
-    multiBoxGeo LoadEntries(const std::string& file);
+    static void SaveEntry(boxGeo boundingBox, uint64_t index, std::ofstream& convertOfs);
+    static multiBoxGeo LoadEntries(const std::string& file);
     static boxGeo createBoundingBox(double pointOneX, double pointOneY, double pointTwoX, double pointTwoY);
+    explicit Rtree(uintmax_t maxBuildingRamUsage);
 };
 
 class ConstructionNode: public Node {
@@ -83,6 +85,19 @@ private:
 public:
     ConstructionNode(long long id, std::vector<multiBoxGeo> orderedBoxes);
     std::vector<multiBoxGeo> GetOrderedBoxes();
+};
+
+class OrderedBoxes {
+private:
+    bool workInRam;
+    multiBoxGeo rectanglesD0InRam;
+    multiBoxGeo rectanglesD1InRam;
+    std::string rectanglesD0OnDisk;
+    std::string rectanglesD1OnDisk;
+public:
+    [[nodiscard]] bool WorkInRam() const;
+    void CreateOrderedBoxesInRam(multiBoxGeo& rectanglesD0, multiBoxGeo& rectanglesD1); // workInRam = true
+    void CreateOrderedBoxesOnDisk(const std::string& rectanglesD0, const std::string& rectanglesD1); // workInRam = false
 };
 
 namespace boost::serialization {

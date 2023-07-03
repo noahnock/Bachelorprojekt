@@ -10,6 +10,7 @@
 #include "Rtree/Rtree.h"
 #include <filesystem>
 #include <regex>
+#include "Rtree/ExternalSorting.cpp"
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -502,7 +503,7 @@ void showCase() {
     //multiBoxGeo boxes = test.loadEntries("../germany_data_tidy.csv");
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    Rtree tree = Rtree();
+    //Rtree tree = Rtree();
     /*Node test_ = Node(7, test.createBoundingBox(0, 0, 1, 1));
     Node test_2 = Node(2, test.createBoundingBox(2, 2, 3, 3));
     Node test__2 = Node(42, test.createBoundingBox(123, 456, 789, 369));
@@ -533,9 +534,9 @@ void showCase() {
     }
     std::cout << "Found " << results.size() << " results:" << std::endl;*/
 
-    std::ifstream infile("../switzerland_raw/switzerland_raw.txt");
+    /*std::ifstream infile("../switzerland_raw/switzerland_raw_100k.txt");
     //std::filesystem::create_directory("../switzerland_raw");
-    std::ofstream convertOfs = std::ofstream("../switzerland_raw/test", std::ios::binary);
+    std::ofstream convertOfs = std::ofstream("../switzerland_raw/converted_data_100k", std::ios::binary);
 
     std::cout << "Loading" << std::endl;
 
@@ -544,7 +545,7 @@ void showCase() {
     {
         std::optional<boxGeo> boundingBox = Rtree::ConvertWordToRtreeEntry(line);
         if (boundingBox) {
-            Rtree::SaveEntries(boundingBox.value(), id, convertOfs);
+            Rtree::SaveEntry(boundingBox.value(), id, convertOfs);
         }
         id++;
     }
@@ -558,27 +559,14 @@ void showCase() {
     multiBoxGeo entries = rtree.LoadEntries("../switzerland_raw/test");
     rtree.BuildTree(entries, 16, "../switzerland_raw/rtree_build");
 
-    std::cout << "Finished building the Rtree with " << entries.size() << " entries" << std::endl;
+    std::cout << "Finished building the Rtree with " << entries.size() << " entries" << std::endl;*/
 
     //std::cout << tree.time << std::endl;
 
 
-    // 2.46108
-    // 6.6e-05
-    // 0.003989
-    // 3.536
-    // 1.45942
+    /* External Sorting */
 
-    // 0.000134 for string search
-    // 0.000277 for substring
-    // 1.47477 for wkt parsing
-
-    /*polygonGeo polygon;
-    bg::read_wkt("POLYGON((1 1, 1 10, 10 10, 10 1, 1 1),(2 2,9 2,9 9,2 9,2 2))", polygon);
-    //bg::read_wkt("POLYGON ((35 10, 45 45, 15 40, 10 20, 35 10),(20 30, 35 35, 30 20, 20 30))", polygon);
-    //bg::correct(polygon);
-    std::cout << bg::wkt(polygon) << std::endl;
-    std::cout << (bg::is_valid(polygon) ? "valid" : "invalid") << std::endl;*/
+    externalSort("../switzerland_raw/test", "../switzerland_raw/sorted_data", 5000000, 1);
 
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);

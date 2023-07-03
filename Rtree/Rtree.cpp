@@ -199,23 +199,33 @@ static std::vector<std::vector<multiBoxGeo>> TGSRecursive(const std::vector<mult
     return result;
 }
 
-void Rtree::BuildTree(multiBoxGeo& inputRectangles, size_t M, const std::string& folder) {
+void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string& folder) {
+    const std::string file = onDiskBase + ".tmp";
+
     // prepare the files
     std::filesystem::create_directory(folder);
     std::ofstream nodesOfs = std::ofstream(folder + "/nodes.bin", std::ios::binary);
     std::map<long long, long long> lookup;
 
     // sort the rectangles
+    //OrderedBoxes orderedInputRectangles;
+    if (std::filesystem::file_size(file) * 4 < this->maxBuildingRamUsage) {
+        // do it in ram
+        multiBoxGeo inputRectangles = LoadEntries(file);
+
+        multiBoxGeo RectanglesD0(inputRectangles);
+        multiBoxGeo RectanglesD1(inputRectangles);
+
+        centerOrdering(RectanglesD0, 0);
+        centerOrdering(RectanglesD1, 1);
+
+        //orderedInputRectangles.CreateOrderedBoxesInRam(RectanglesD0, RectanglesD1);
+    } else {
+        // do it on disk
+
+    }
+
     std::vector<multiBoxGeo> orderedInputRectangles;
-
-    multiBoxGeo RectanglesD0(inputRectangles);
-    multiBoxGeo RectanglesD1(inputRectangles);
-
-    centerOrdering(RectanglesD0, 0);
-    centerOrdering(RectanglesD1, 1);
-
-    orderedInputRectangles.push_back(RectanglesD0);
-    orderedInputRectangles.push_back(RectanglesD1);
 
     // build the tree in a depth first approach
     std::stack<ConstructionNode> layerStack;
@@ -501,7 +511,7 @@ std::optional<boxGeo> Rtree::ConvertWordToRtreeEntry(const std::string& wkt) {
     return boundingBox;
 }
 
-void Rtree::SaveEntries(boxGeo boundingBox, uint64_t index, std::ofstream& convertOfs) {
+void Rtree::SaveEntry(boxGeo boundingBox, uint64_t index, std::ofstream& convertOfs) {
     /* write the boundingbox value to file */
     double minX = boundingBox.min_corner().get<0>();
     double minY = boundingBox.min_corner().get<1>();
@@ -543,4 +553,24 @@ multiBoxGeo Rtree::LoadEntries(const std::string& file) {
 
     loadEntriesIfs.close();
     return boxes;
+}
+
+Rtree::Rtree(uintmax_t maxBuildingRamUsage) {
+    this->maxBuildingRamUsage = maxBuildingRamUsage;
+}
+
+bool OrderedBoxes::WorkInRam() const{
+    return this->workInRam;
+}
+
+void OrderedBoxes::CreateOrderedBoxesInRam(multiBoxGeo& rectanglesD0, multiBoxGeo& rectanglesD1) {
+    this->workInRam = true;
+    this->rectanglesD0InRam = rectanglesD0;
+    this->rectanglesD1InRam = rectanglesD1;
+}
+
+void OrderedBoxes::CreateOrderedBoxesOnDisk(const std::string& rectanglesD0, const std::string& rectanglesD1) {
+    this->workInRam = false;
+    this->rectanglesD0OnDisk = rectanglesD0;
+    this->rectanglesD1OnDisk = rectanglesD1;
 }
