@@ -10,7 +10,6 @@
 #include "Rtree/Rtree.h"
 #include <filesystem>
 #include <regex>
-#include "Rtree/ExternalSorting.cpp"
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -563,10 +562,14 @@ void showCase() {
 
     //std::cout << tree.time << std::endl;
 
-
-    /* External Sorting */
-
-    externalSort("../switzerland_raw/test", "../switzerland_raw/sorted_data", 5000000, 1);
+    Rtree rtree = Rtree(2000000);
+    rtree.BuildTree("../switzerland_raw/converted_data_100k", 16, "../switzerland_raw/rtree_build");
+    /*multiBoxGeo results = rtree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland");
+    for(rTreeValue result : results) {
+        std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
+                  << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
+    }
+    std::cout << "Found " << results.size() << " results:" << std::endl;*/
 
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);

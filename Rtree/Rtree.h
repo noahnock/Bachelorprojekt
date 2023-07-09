@@ -24,9 +24,6 @@ using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::de
 using boxGeo = bg::model::box<pointGeo>;
 using rTreeValue = std::pair<boxGeo, long long>;
 using multiBoxGeo = std::vector<rTreeValue>;
-/*using polygonGeo = bg::model::polygon<pointGeo>;
-using multiPolygonGeo = bg::model::multi_polygon<polygonGeo>;
-using linestringGeo = bg::model::linestring<pointGeo>;*/
 
 using bg::make;
 
@@ -78,18 +75,10 @@ public:
     explicit Rtree(uintmax_t maxBuildingRamUsage);
 };
 
-class ConstructionNode: public Node {
-private:
-    std::vector<multiBoxGeo> orderedBoxes;
-
-public:
-    ConstructionNode(long long id, std::vector<multiBoxGeo> orderedBoxes);
-    std::vector<multiBoxGeo> GetOrderedBoxes();
-};
-
 class OrderedBoxes {
-private:
+public:
     bool workInRam;
+    long long size;
     multiBoxGeo rectanglesD0InRam;
     multiBoxGeo rectanglesD1InRam;
     std::string rectanglesD0OnDisk;
@@ -97,7 +86,20 @@ private:
 public:
     [[nodiscard]] bool WorkInRam() const;
     void CreateOrderedBoxesInRam(multiBoxGeo& rectanglesD0, multiBoxGeo& rectanglesD1); // workInRam = true
-    void CreateOrderedBoxesOnDisk(const std::string& rectanglesD0, const std::string& rectanglesD1); // workInRam = false
+    void CreateOrderedBoxesOnDisk(const std::string& rectanglesD0, const std::string& rectanglesD1, long long size); // workInRam = false
+    boxGeo GetBoundingBox();
+    long long GetSize() const;
+    rTreeValue GetElementAt(size_t dim, long long index);
+    std::pair<OrderedBoxes, OrderedBoxes> SplitAt(const std::string& filePath, size_t dim, long long index, boxGeo boundingBox, long long maxBuildingRamUsage);
+};
+
+class ConstructionNode: public Node {
+private:
+    OrderedBoxes orderedBoxes;
+
+public:
+    ConstructionNode(long long id, OrderedBoxes orderedBoxes);
+    OrderedBoxes GetOrderedBoxes();
 };
 
 namespace boost::serialization {
