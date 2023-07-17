@@ -24,6 +24,8 @@ using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::de
 using boxGeo = bg::model::box<pointGeo>;
 using rTreeValue = std::pair<boxGeo, long long>;
 using multiBoxGeo = std::vector<rTreeValue>;
+using rTreeValueWithOrderIndex = std::pair<rTreeValue, std::pair<long long, long long>>;
+using multiBoxWithOrderIndex = std::vector<rTreeValueWithOrderIndex>;
 
 using bg::make;
 
@@ -70,19 +72,25 @@ public:
     multiBoxGeo SearchTree(boxGeo query, const std::string& folder);
     static std::optional<boxGeo> ConvertWordToRtreeEntry(const std::string& wkt);
     static void SaveEntry(boxGeo boundingBox, uint64_t index, std::ofstream& convertOfs);
+    static void SaveEntryWithOrderIndex(rTreeValueWithOrderIndex treeValue, std::ofstream& convertOfs);
     static multiBoxGeo LoadEntries(const std::string& file);
+    multiBoxWithOrderIndex LoadEntriesWithOrderIndex(const std::string& file);
     static boxGeo createBoundingBox(double pointOneX, double pointOneY, double pointTwoX, double pointTwoY);
     explicit Rtree(uintmax_t maxBuildingRamUsage);
 };
 
 class OrderedBoxes {
-public:
+public: // TODO
     bool workInRam;
     long long size;
     multiBoxGeo rectanglesD0InRam;
     multiBoxGeo rectanglesD1InRam;
     std::string rectanglesD0OnDisk;
+    std::string rectanglesD0SmallOnDisk;
     std::string rectanglesD1OnDisk;
+    std::string rectanglesD1SmallOnDisk;
+    std::pair<OrderedBoxes, OrderedBoxes> SplitAtBestInRam(size_t S);
+    std::pair<OrderedBoxes, OrderedBoxes> SplitAtBestOnDisk(const std::string& filePath, size_t S, long long maxBuildingRamUsage);
 public:
     [[nodiscard]] bool WorkInRam() const;
     void CreateOrderedBoxesInRam(multiBoxGeo& rectanglesD0, multiBoxGeo& rectanglesD1); // workInRam = true
@@ -91,6 +99,7 @@ public:
     long long GetSize() const;
     rTreeValue GetElementAt(size_t dim, long long index);
     std::pair<OrderedBoxes, OrderedBoxes> SplitAt(const std::string& filePath, size_t dim, long long index, boxGeo boundingBox, long long maxBuildingRamUsage);
+    std::pair<OrderedBoxes, OrderedBoxes> SplitAtBest(const std::string& filePath, size_t S, long long maxBuildingRamUsage);
 };
 
 class ConstructionNode: public Node {
