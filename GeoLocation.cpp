@@ -562,8 +562,8 @@ void showCase() {
 
     //std::cout << tree.time << std::endl;
 
-    Rtree rtree = Rtree(1300000000);
-    rtree.BuildTree("../switzerland_raw/converted_data", 16, "../switzerland_raw/rtree_build");
+    Rtree rtree = Rtree(4000000);
+    rtree.BuildTree("../switzerland_raw/converted_data_100k", 16, "../switzerland_raw/rtree_build");
     /*multiBoxGeo results = rtree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland");
     for(rTreeValue result : results) {
         std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()

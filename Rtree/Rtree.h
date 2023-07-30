@@ -90,7 +90,7 @@ public: // TODO
     std::string rectanglesD1OnDisk;
     std::string rectanglesD1SmallOnDisk;
     std::pair<OrderedBoxes, OrderedBoxes> SplitAtBestInRam(size_t S);
-    std::pair<OrderedBoxes, OrderedBoxes> SplitAtBestOnDisk(const std::string& filePath, size_t S, long long maxBuildingRamUsage);
+    std::pair<OrderedBoxes, OrderedBoxes> SplitAtBestOnDisk(const std::string& filePath, size_t S, long long maxBuildingRamUsage) const;
 public:
     [[nodiscard]] bool WorkInRam() const;
     void CreateOrderedBoxesInRam(multiBoxGeo& rectanglesD0, multiBoxGeo& rectanglesD1); // workInRam = true
@@ -98,7 +98,6 @@ public:
     boxGeo GetBoundingBox();
     long long GetSize() const;
     rTreeValue GetElementAt(size_t dim, long long index);
-    std::pair<OrderedBoxes, OrderedBoxes> SplitAt(const std::string& filePath, size_t dim, long long index, boxGeo boundingBox, long long maxBuildingRamUsage);
     std::pair<OrderedBoxes, OrderedBoxes> SplitAtBest(const std::string& filePath, size_t S, long long maxBuildingRamUsage);
 };
 
