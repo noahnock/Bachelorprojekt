@@ -3,6 +3,7 @@
 //  Author: Noah Nock <noah.v.nock@gmail.com>
 
 #include "Rtree.h"
+#include "../ExternalSorting.cpp"
 
 bool intersects(const boxGeo &b1, const boxGeo &b2) {
     bool notIntersecting = b1.min_corner().get<0>() > b2.max_corner().get<0>() ||
@@ -65,16 +66,21 @@ static void centerOrdering(multiBoxWithOrderIndex& boxes, size_t dim) {
     }
 }
 
-static double costFunctionTGS(boxGeo& b0, boxGeo& b1) {
+static double costFunctionTGS(boxGeo& b0, boxGeo& b1, size_t dim) {
     /*
        * To accelerate the algorithm, make sure that both boxes are of similar size.
      */
+    double cost;
 
-    double areaB0 = (b0.max_corner().get<0>() - b0.min_corner().get<0>()) * (b0.max_corner().get<1>() - b0.min_corner().get<1>());
-    double areaB1 = (b1.max_corner().get<0>() - b1.min_corner().get<0>()) * (b1.max_corner().get<1>() - b1.min_corner().get<1>());
-    double difference = std::abs(areaB0 - areaB1);
+    if (dim == 0) {
+        cost = b0.max_corner().get<0>() - b1.min_corner().get<0>();
+        cost = cost < 0 ? 0 : cost;
+    } else {
+        cost = b0.max_corner().get<1>() - b1.min_corner().get<1>();
+        cost = cost < 0 ? 0 : cost;
+    }
 
-    return difference;
+    return cost;
 }
 
 boxGeo Rtree::createBoundingBox(double pointOneX, double pointOneY, double pointTwoX, double pointTwoY) {
@@ -154,6 +160,7 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
         }
 
         centerOrdering(*RectanglesD1WithOrder, 1);
+
         R1Small->push_back((*RectanglesD1WithOrder)[0]);
         rTreeValueWithOrderIndex maxElementDim1 = (*RectanglesD1WithOrder)[RectanglesD1WithOrder->size() - 1];
         maxElementDim1.second.second = RectanglesD1WithOrder->size() - 1;
@@ -188,94 +195,13 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
         std::cout << "Finished initial sorting" << std::endl;
     } else {
         std::cout << "Building on disk" << std::endl;
-        // do it on disk
 
-        // TODO sort on disk instead of ram
-        // START
-        multiBoxGeo RectanglesD0 = LoadEntries(file);
-
-        centerOrdering(RectanglesD0, 0);
-
-        long long xSize = 0;
-        double globalMinX = -1;
-        double globalMinY = -1;
-        double globalMaxX = -1;
-        double globalMaxY = -1;
-
-        std::ofstream r0File = std::ofstream(onDiskBase + ".boundingbox.d0.tmp", std::ios::binary);
-        for (rTreeValue element : RectanglesD0) {
-            rTreeValueWithOrderIndex entry = std::make_pair(element, std::make_pair(xSize, 0));
-            Rtree::SaveEntryWithOrderIndex(entry, r0File);
-            xSize++;
-
-            if (globalMinX == -1 || element.first.min_corner().get<0>() < globalMinX) {
-                globalMinX = element.first.min_corner().get<0>();
-            }
-            if (globalMinY == -1 || element.first.min_corner().get<1>() < globalMinY) {
-                globalMinY = element.first.min_corner().get<1>();
-            }
-            if (element.first.max_corner().get<0>() > globalMaxX) {
-                globalMaxX = element.first.max_corner().get<0>();
-            }
-            if (element.first.max_corner().get<1>() > globalMaxY) {
-                globalMaxY = element.first.max_corner().get<1>();
-            }
-        }
-        r0File.close();
-        RectanglesD0.clear();
-
-        multiBoxWithOrderIndex RectanglesD1 = LoadEntriesWithOrderIndex(onDiskBase + ".boundingbox.d0.tmp");
-        centerOrdering(RectanglesD1, 1);
-
-        size_t currentS = std::ceil(((float) xSize) / ((float) M));
-
-        long long ySize = 0;
-        std::ofstream r1File = std::ofstream(onDiskBase + ".boundingbox.d1.tmp", std::ios::binary);
-        std::shared_ptr<multiBoxWithOrderIndex> r1Small = std::make_shared<multiBoxWithOrderIndex>();
-        r1Small->push_back(RectanglesD1[0]);
-        rTreeValueWithOrderIndex maxElementDim1 = RectanglesD1[RectanglesD1.size() - 1];
-        maxElementDim1.second.second = RectanglesD1.size() - 1;
-        r1Small->push_back(maxElementDim1);
-        for (rTreeValueWithOrderIndex element : RectanglesD1) {
-            element.second.second = ySize;
-            Rtree::SaveEntryWithOrderIndex(element, r1File);
-
-            if (((ySize + 1) % currentS == 0 && (ySize + 1) / currentS >= 1 && (ySize + 1) / currentS < M)
-            || (ySize % currentS == 0 && ySize / currentS >= 1 && ySize / currentS < M)) {
-                // index i * S - 1 or i * S
-                r1Small->push_back(element);
-            }
-
-            ySize++;
-        }
-        r1File.close();
-        RectanglesD1.clear();
-
-        multiBoxWithOrderIndex RectanglesD0Second = LoadEntriesWithOrderIndex(onDiskBase + ".boundingbox.d1.tmp");
-        centerOrdering(RectanglesD0Second, 0);
-
-        long long currentX = 0;
-        std::ofstream r0FileSecond = std::ofstream(onDiskBase + ".boundingbox.d0.tmp", std::ios::binary);
         std::shared_ptr<multiBoxWithOrderIndex> r0Small = std::make_shared<multiBoxWithOrderIndex>();
-        r0Small->push_back(RectanglesD0Second[0]);
-        r0Small->push_back(RectanglesD0Second[RectanglesD0Second.size() - 1]);
-        for (rTreeValueWithOrderIndex element : RectanglesD0Second) {
-            Rtree::SaveEntryWithOrderIndex(element, r0FileSecond);
+        std::shared_ptr<multiBoxWithOrderIndex> r1Small = std::make_shared<multiBoxWithOrderIndex>();
+        std::pair<boxGeo, long long> externalSortResult = ExternalSort(onDiskBase, r0Small, r1Small, M);
 
-            if (((currentX + 1) % currentS == 0 && (currentX + 1) / currentS >= 1 && (currentX + 1) / currentS < M)
-                || (currentX % currentS == 0 && currentX / currentS >= 1 && currentX / currentS < M)) {
-                // index i * S - 1 or i * S
-                r0Small->push_back(element);
-            }
-
-            currentX++;
-        }
-        r0FileSecond.close();
-        RectanglesD0Second.clear();
-        // END
-
-        orderedInputRectangles.CreateOrderedBoxesOnDisk(onDiskBase + ".boundingbox.d0", onDiskBase + ".boundingbox.d1", r0Small, r1Small, xSize,
-                                                        createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY));
+        orderedInputRectangles.CreateOrderedBoxesOnDisk(onDiskBase + ".boundingbox.d0", onDiskBase + ".boundingbox.d1", r0Small, r1Small,
+                                                        externalSortResult.second, externalSortResult.first);
         std::cout << "Finished initial sorting" << std::endl;
     }
 
@@ -744,7 +670,7 @@ SplitResult OrderedBoxes::GetBestSplit() {
             boxGeo b1 = Rtree::createBoundingBox(minXB1, minYB1, maxXB1, maxYB1);
 
 
-            double cost = costFunctionTGS(b0, b1);
+            double cost = costFunctionTGS(b0, b1, dim);
 
             if (splitResult.bestCost == -1 || cost < splitResult.bestCost) {
                 splitResult.bestCost = cost;
