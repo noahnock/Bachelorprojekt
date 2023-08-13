@@ -77,24 +77,6 @@ static double costFunctionTGS(boxGeo& b0, boxGeo& b1) {
     return difference;
 }
 
-static bool pointWithinBox(pointGeo point, boxGeo box) {
-    return point.get<0>() >= box.min_corner().get<0>() && point.get<0>() <= box.max_corner().get<0>() && point.get<1>() >= box.min_corner().get<1>() && point.get<1>() <= box.max_corner().get<1>();
-}
-
-static bool boxInMultiBox(rTreeValueWithOrderIndex& item, std::shared_ptr<multiBoxWithOrderIndex> boxes) {
-    for (rTreeValueWithOrderIndex currentItem : *boxes) {
-        boxGeo currentBox = currentItem.first.first;
-        boxGeo box = item.first.first;
-        if (currentItem.second == item.second && box.min_corner().get<0>() == currentBox.min_corner().get<0>()
-            && box.min_corner().get<1>() == currentBox.min_corner().get<1>()
-            && box.max_corner().get<0>() == currentBox.max_corner().get<0>()
-            && box.max_corner().get<1>() == currentBox.max_corner().get<1>()) {
-            return true;
-        }
-    }
-    return false;
-}
-
 boxGeo Rtree::createBoundingBox(double pointOneX, double pointOneY, double pointTwoX, double pointTwoY) {
     return make<boxGeo>(make<pointGeo>(pointOneX, pointOneY), make<pointGeo>(pointTwoX, pointTwoY));
 }
@@ -113,10 +95,6 @@ static std::vector<OrderedBoxes> TGSRecursive(const std::string& filePath, Order
     // split the rectangles at the best split
     std::pair<OrderedBoxes, OrderedBoxes> split = orderedInputRectangles.SplitAtBest(filePath, S, M, maxBuildingRamUsage);
 
-    if (split.first.GetSize() % S != 0) {
-        int fdgfg = 0;
-    }
-
     // recursion
     std::vector<OrderedBoxes> result0 = TGSRecursive(filePath + ".0", split.first, M, S, maxBuildingRamUsage);
     std::vector<OrderedBoxes> result1 = TGSRecursive(filePath + ".1", split.second, M, S, maxBuildingRamUsage);
@@ -128,7 +106,7 @@ static std::vector<OrderedBoxes> TGSRecursive(const std::string& filePath, Order
     return result;
 }
 
-void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string& folder) {
+void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string& folder) const {
     const std::string file = onDiskBase + ".boundingbox.tmp";
 
     // prepare the files
@@ -151,7 +129,6 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
         double globalMaxY = -1;
 
         size_t currentS = std::ceil(((float) RectanglesD0.size()) / ((float) M));
-        //size_t iLimit = std::ceil(RectanglesD0.size() / currentS);
 
         std::shared_ptr<multiBoxWithOrderIndex> R0Small = std::make_shared<multiBoxWithOrderIndex>();
         std::shared_ptr<multiBoxWithOrderIndex> R1Small = std::make_shared<multiBoxWithOrderIndex>();
@@ -184,8 +161,8 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
         for (long long i = 0; i < RectanglesD1WithOrder->size(); i++) {
             (*RectanglesD1WithOrder)[i].second.second = i;
 
-            if (((i + 1) % currentS == 0 && (i + 1) / currentS >= 1/* && (i + 1) / currentS < iLimit*/)
-                || (i % currentS == 0 && i / currentS >= 1/* && i / currentS < iLimit*/)) {
+            if (((i + 1) % currentS == 0 && (i + 1) / currentS >= 1 && (i + 1) / currentS < M)
+                || (i % currentS == 0 && i / currentS >= 1 && i / currentS < M)) {
                 // index i * S - 1 or i * S
                 R1Small->push_back((*RectanglesD1WithOrder)[i]);
             }
@@ -199,10 +176,8 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
         maxElementDim0.second.second = RectanglesD0WithOrder->size() - 1;
         R0Small->push_back(maxElementDim0);
         for (long long i = 0; i < RectanglesD0WithOrder->size(); i++) {
-            //(*RectanglesD0WithOrder)[i].second.second = i;
-
-            if (((i + 1) % currentS == 0 && (i + 1) / currentS >= 1/* && (i + 1) / currentS < iLimit*/)
-                || (i % currentS == 0 && i / currentS >= 1/* && i / currentS < iLimit*/)) {
+            if (((i + 1) % currentS == 0 && (i + 1) / currentS >= 1 && (i + 1) / currentS < M)
+                || (i % currentS == 0 && i / currentS >= 1 && i / currentS < M)) {
                 // index i * S - 1 or i * S
                 R0Small->push_back((*RectanglesD0WithOrder)[i]);
             }
@@ -253,7 +228,6 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
         centerOrdering(RectanglesD1, 1);
 
         size_t currentS = std::ceil(((float) xSize) / ((float) M));
-        size_t iLimit = std::ceil(xSize / currentS);
 
         long long ySize = 0;
         std::ofstream r1File = std::ofstream(onDiskBase + ".boundingbox.d1.tmp", std::ios::binary);
@@ -266,8 +240,8 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
             element.second.second = ySize;
             Rtree::SaveEntryWithOrderIndex(element, r1File);
 
-            if (((ySize + 1) % currentS == 0 && (ySize + 1) / currentS >= 1 && (ySize + 1) / currentS < iLimit)
-            || (ySize % currentS == 0 && ySize / currentS >= 1 && ySize / currentS < iLimit)) {
+            if (((ySize + 1) % currentS == 0 && (ySize + 1) / currentS >= 1 && (ySize + 1) / currentS < M)
+            || (ySize % currentS == 0 && ySize / currentS >= 1 && ySize / currentS < M)) {
                 // index i * S - 1 or i * S
                 r1Small->push_back(element);
             }
@@ -288,8 +262,8 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
         for (rTreeValueWithOrderIndex element : RectanglesD0Second) {
             Rtree::SaveEntryWithOrderIndex(element, r0FileSecond);
 
-            if (((currentX + 1) % currentS == 0 && (currentX + 1) / currentS >= 1 && (currentX + 1) / currentS < iLimit)
-                || (currentX % currentS == 0 && currentX / currentS >= 1 && currentX / currentS < iLimit)) {
+            if (((currentX + 1) % currentS == 0 && (currentX + 1) / currentS >= 1 && (currentX + 1) / currentS < M)
+                || (currentX % currentS == 0 && currentX / currentS >= 1 && currentX / currentS < M)) {
                 // index i * S - 1 or i * S
                 r0Small->push_back(element);
             }
@@ -392,40 +366,21 @@ ConstructionNode::ConstructionNode(long long id, OrderedBoxes orderedBoxes)
 
 void ConstructionNode::AddChildrenToItem() {
     if (this->GetOrderedBoxes().WorkInRam()) {
-        for(rTreeValueWithOrderIndex box : *this->GetOrderedBoxes().GetRectanglesD0InRam()) {
+        for(rTreeValueWithOrderIndex box : *this->GetOrderedBoxes().GetRectanglesInRam()) {
             Node leafNode = Node(box.first.second, box.first.first);
             this->AddChild(leafNode);
         }
     } else {
-        std::ifstream loadEntriesIfs = std::ifstream(this->GetOrderedBoxes().GetRectanglesD0OnDisk(), std::ios::binary);
-        loadEntriesIfs.seekg (0, std::ifstream::end);
-        long long fileLength = loadEntriesIfs.tellg();
-        loadEntriesIfs.seekg (0, std::ifstream::beg);
+        FileReader fileReader = FileReader(this->GetOrderedBoxes().GetRectanglesOnDisk());
 
-        double minX;
-        double minY;
-        double maxX;
-        double maxY;
-        uint64_t id;
-        long long orderX;
-        long long orderY;
-
-        while (loadEntriesIfs.tellg() < fileLength) {
-            loadEntriesIfs.read(reinterpret_cast<char*>(&minX), sizeof(double));
-            loadEntriesIfs.read(reinterpret_cast<char*>(&minY), sizeof(double));
-            loadEntriesIfs.read(reinterpret_cast<char*>(&maxX), sizeof(double));
-            loadEntriesIfs.read(reinterpret_cast<char*>(&maxY), sizeof(double));
-            loadEntriesIfs.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
-            loadEntriesIfs.read(reinterpret_cast<char*>(&orderX), sizeof(long long));
-            loadEntriesIfs.read(reinterpret_cast<char*>(&orderY), sizeof(long long));
-
-            boxGeo box = Rtree::createBoundingBox(minX, minY, maxX, maxY);
-            rTreeValue boxWithId = std::make_pair(box, id);
-            Node leafNode = Node(boxWithId.second, boxWithId.first);
+        std::optional<rTreeValueWithOrderIndex> element = fileReader.GetNextElement();
+        while(element) {
+            Node leafNode = Node(element.value().first.second, element.value().first.first);
             this->AddChild(leafNode);
+            element = fileReader.GetNextElement();
         }
 
-        loadEntriesIfs.close();
+        fileReader.Close();
     }
 }
 
@@ -437,9 +392,9 @@ OrderedBoxes ConstructionNode::GetOrderedBoxes() {
     return this->orderedBoxes;
 }
 
-Node::Node(long long id, boxGeo boundingBox) {
+Node::Node(long long id, boxGeo boundingbox) {
     this->id = id;
-    this->boundingBox = boundingBox;
+    this->boundingBox = boundingbox;
 }
 
 Node::Node(long long id) {
@@ -476,7 +431,7 @@ void Node::SetIsLastInnerNode(bool _isLastInnerNode) {
     this->isLastInnerNode = _isLastInnerNode;
 }
 
-bool Node::GetIsLastInnerNode() {
+bool Node::GetIsLastInnerNode() const {
     return this->isLastInnerNode;
 }
 
@@ -666,35 +621,16 @@ multiBoxGeo Rtree::LoadEntries(const std::string& file) {
 
 multiBoxWithOrderIndex Rtree::LoadEntriesWithOrderIndex(const std::string& file) {
     multiBoxWithOrderIndex boxes;
+    FileReader fileReader = FileReader(file);
 
-    std::ifstream loadEntriesIfs = std::ifstream(file, std::ios::binary);
-    loadEntriesIfs.seekg (0, std::ifstream::end);
-    long long fileLength = loadEntriesIfs.tellg();
-    loadEntriesIfs.seekg (0, std::ifstream::beg);
-
-    double minX;
-    double minY;
-    double maxX;
-    double maxY;
-    uint64_t id;
-    long long orderX;
-    long long orderY;
-
-    while (loadEntriesIfs.tellg() < fileLength) {
-        loadEntriesIfs.read(reinterpret_cast<char*>(&minX), sizeof(double));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&minY), sizeof(double));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&maxX), sizeof(double));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&maxY), sizeof(double));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&orderX), sizeof(long long));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&orderY), sizeof(long long));
-
-        boxGeo box = createBoundingBox(minX, minY, maxX, maxY);
-        rTreeValue boxWithId = std::make_pair(box, id);
-        boxes.emplace_back(boxWithId, std::make_pair(orderX, orderY));
+    std::optional<rTreeValueWithOrderIndex> element = fileReader.GetNextElement();
+    while (element) {
+        boxes.push_back(element.value());
+        element = fileReader.GetNextElement();
     }
 
-    loadEntriesIfs.close();
+    fileReader.Close();
+
     return boxes;
 }
 
@@ -734,20 +670,12 @@ long long OrderedBoxes::GetSize() const {
     return this->size;
 }
 
-std::shared_ptr<multiBoxWithOrderIndex> OrderedBoxes::GetRectanglesD0InRam() {
+std::shared_ptr<multiBoxWithOrderIndex> OrderedBoxes::GetRectanglesInRam() {
     return this->rectanglesD0InRam;
 }
 
-std::shared_ptr<multiBoxWithOrderIndex> OrderedBoxes::GetRectanglesD1InRam() {
-    return this->rectanglesD1InRam;
-}
-
-std::string OrderedBoxes::GetRectanglesD0OnDisk() {
+std::string OrderedBoxes::GetRectanglesOnDisk() {
     return this->rectanglesD0OnDisk;
-}
-
-std::string OrderedBoxes::GetRectanglesD1OnDisk() {
-    return this->rectanglesD1OnDisk;
 }
 
 SplitResult OrderedBoxes::GetBestSplit() {
@@ -760,123 +688,75 @@ SplitResult OrderedBoxes::GetBestSplit() {
 
     bool currentlyAtSTimesI = false;
 
-    // dim 0
+    for (size_t dim = 0; dim < 2; dim++) {
+        for (long long i = 0; i < this->rectanglesD0Small->size(); i++) {
+            currentElement = dim == 0 ? (*this->rectanglesD0Small)[i] : (*this->rectanglesD1Small)[i];
 
-    for (long long i = 0; i < (*this->rectanglesD0Small).size(); i++) {
-        currentElement = (*this->rectanglesD0Small)[i];
+            if (i == 0) {
+                // this is the min element
+                minElement = currentElement;
+                continue;
+            }
 
-        if (i == 0) {
-            // this is the min element
-            minElement = currentElement;
-            continue;
+            if (i == 1) {
+                // this is the max element
+                maxElement = currentElement;
+                continue;
+            }
+
+            if (!currentlyAtSTimesI) {
+                currentLastElement = currentElement;
+                currentlyAtSTimesI = true;
+                continue;
+            }
+
+            double minXB0 = 0;
+            double maxXB0 = 1;
+            double minXB1 = 0;
+            double maxXB1 = 1;
+            double minYB0 = 0;
+            double maxYB0 = 1;
+            double minYB1 = 0;
+            double maxYB1 = 1;
+
+            if (currentlyAtSTimesI && currentElement.first.second != maxElement.first.second) {
+
+                if (dim == 0) {
+                    minXB0 = (minElement.first.first.min_corner().get<0>() + minElement.first.first.max_corner().get<0>()) / 2;
+                    maxXB0 = (currentLastElement.first.first.min_corner().get<0>() + currentLastElement.first.first.max_corner().get<0>()) / 2;
+
+                    minXB1 = (currentElement.first.first.min_corner().get<0>() + currentElement.first.first.max_corner().get<0>()) / 2;
+                    maxXB1 = (maxElement.first.first.min_corner().get<0>() + maxElement.first.first.max_corner().get<0>()) / 2;
+                } else {
+                    minYB0 = (minElement.first.first.min_corner().get<1>() + minElement.first.first.max_corner().get<1>()) / 2;
+                    maxYB0 = (currentLastElement.first.first.min_corner().get<1>() + currentLastElement.first.first.max_corner().get<1>()) / 2;
+
+                    minYB1 = (currentElement.first.first.min_corner().get<1>() + currentElement.first.first.max_corner().get<1>()) / 2;
+                    maxYB1 = (maxElement.first.first.min_corner().get<1>() + maxElement.first.first.max_corner().get<1>()) / 2;
+                }
+
+                currentlyAtSTimesI = false;
+            } else {
+                break;
+            }
+
+            boxGeo b0 = Rtree::createBoundingBox(minXB0, minYB0, maxXB0, maxYB0);
+            boxGeo b1 = Rtree::createBoundingBox(minXB1, minYB1, maxXB1, maxYB1);
+
+
+            double cost = costFunctionTGS(b0, b1);
+
+            if (splitResult.bestCost == -1 || cost < splitResult.bestCost) {
+                splitResult.bestCost = cost;
+                splitResult.bestDim = dim;
+                splitResult.bestLastElement = currentLastElement;
+                splitResult.bestElement = currentElement;
+                splitResult.bestMinElement = minElement;
+                splitResult.bestMaxElement = maxElement;
+                splitResult.bestIndex = i;
+            }
         }
-
-        if (i == 1) {
-            // this is the max element
-            maxElement = currentElement;
-            continue;
-        }
-
-        double minXB0 = 0;
-        double maxXB0 = 1;
-        double minXB1 = 0;
-        double maxXB1 = 1;
-
-        if (!currentlyAtSTimesI) {
-            currentLastElement = currentElement;
-            currentlyAtSTimesI = true;
-            continue;
-        }
-
-        if (currentlyAtSTimesI && currentElement.first.second != maxElement.first.second) {
-
-            minXB0 = (minElement.first.first.min_corner().get<0>() + minElement.first.first.max_corner().get<0>()) / 2;
-            maxXB0 = (currentLastElement.first.first.min_corner().get<0>() + currentLastElement.first.first.max_corner().get<0>()) / 2;
-
-            minXB1 = (currentElement.first.first.min_corner().get<0>() + currentElement.first.first.max_corner().get<0>()) / 2;
-            maxXB1 = (maxElement.first.first.min_corner().get<0>() + maxElement.first.first.max_corner().get<0>()) / 2;
-
-            currentlyAtSTimesI = false;
-        } else {
-            break;
-        }
-
-        boxGeo b0 = Rtree::createBoundingBox(minXB0, 0, maxXB0, 1);
-        boxGeo b1 = Rtree::createBoundingBox(minXB1, 0, maxXB1, 1);
-
-
-        double cost = costFunctionTGS(b0, b1);
-
-        if (splitResult.bestCost == -1 || cost < splitResult.bestCost) {
-            splitResult.bestCost = cost;
-            splitResult.bestDim = 0;
-            splitResult.bestB0 = b0;
-            splitResult.bestLastElement = currentLastElement;
-            splitResult.bestElement = currentElement;
-            splitResult.bestMinElement = minElement;
-            splitResult.bestMaxElement = maxElement;
-            splitResult.bestIndex = i;
-        }
-    }
-
-    // dim 1
-
-    currentlyAtSTimesI = false;
-
-    for (long long i = 0; i < (*this->rectanglesD1Small).size(); i++) {
-        currentElement = (*this->rectanglesD1Small)[i];
-
-        if (i == 0) {
-            // this is the min element
-            minElement = currentElement;
-            continue;
-        }
-
-        if (i == 1) {
-            // this is the max element
-            maxElement = currentElement;
-            continue;
-        }
-
-        double minYB0 = 0;
-        double maxYB0 = 1;
-        double minYB1 = 0;
-        double maxYB1 = 1;
-
-        if (!currentlyAtSTimesI) {
-            currentLastElement = currentElement;
-            currentlyAtSTimesI = true;
-            continue;
-        }
-
-        if (currentlyAtSTimesI && currentElement.first.second != maxElement.first.second) {
-            minYB0 = (minElement.first.first.min_corner().get<1>() + minElement.first.first.max_corner().get<1>()) / 2;
-            maxYB0 = (currentLastElement.first.first.min_corner().get<1>() + currentLastElement.first.first.max_corner().get<1>()) / 2;
-
-            minYB1 = (currentElement.first.first.min_corner().get<1>() + currentElement.first.first.max_corner().get<1>()) / 2;
-            maxYB1 = (maxElement.first.first.min_corner().get<1>() + maxElement.first.first.max_corner().get<1>()) / 2;
-
-            currentlyAtSTimesI = false;
-        } else {
-            break;
-        }
-
-        boxGeo b0 = Rtree::createBoundingBox(0, minYB0, 1, maxYB0);
-        boxGeo b1 = Rtree::createBoundingBox(0, minYB1, 1, maxYB1);
-
-
-        double cost = costFunctionTGS(b0, b1);
-
-        if (splitResult.bestCost == -1 || cost < splitResult.bestCost) {
-            splitResult.bestCost = cost;
-            splitResult.bestDim = 1;
-            splitResult.bestB0 = b0;
-            splitResult.bestLastElement = currentLastElement;
-            splitResult.bestElement = currentElement;
-            splitResult.bestMinElement = minElement;
-            splitResult.bestMaxElement = maxElement;
-            splitResult.bestIndex = i;
-        }
+        currentlyAtSTimesI = false;
     }
 
     return splitResult;
@@ -890,214 +770,28 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBest(const std::strin
     }
 }
 
-bool CheckIfListsContainSameElements(std::shared_ptr<multiBoxWithOrderIndex> list1, std::shared_ptr<multiBoxWithOrderIndex> list2) {
-    if (list1->size() != list2->size()) return false;
-
-    std::map m = std::map<long long, std::pair<long long, long long>>();
-
-    for (rTreeValueWithOrderIndex element : *list1) {
-        m[element.first.second] = element.second;
-
-        if (element.first.second == 5199) {
-            int i = 0;
-        }
-    }
-
-    if (list1->size() != m.size()) return false;
-
-    for (rTreeValueWithOrderIndex element : *list2) {
-        if (element.first.second == 5199) {
-            int i = 0;
-        }
-        if (m.find(element.first.second) == m.end()) return false;
-        long long id = element.first.second;
-        std::pair<long long, long long> pair1 = m[element.first.second];
-        std::pair<long long, long long> pair2 = element.second;
-        if (m[element.first.second] != element.second) return false;
-        m.erase(element.first.second);
-    }
-
-    return true;
-}
-
 std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestInRam(size_t S, size_t M) {
     struct SplitResult splitResult = this->GetBestSplit();
 
     OrderedBoxes split0;
     OrderedBoxes split1;
 
-    std::shared_ptr<multiBoxWithOrderIndex> s0Dim0 = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> s0Dim1 = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> s1Dim0 = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> s1Dim1 = std::make_shared<multiBoxWithOrderIndex>();
+    struct SplitBuffersRam splitBuffers;
 
-    std::shared_ptr<multiBoxWithOrderIndex> s0SmallDim0 = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> s0SmallDim1 = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> s1SmallDim0 = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> s1SmallDim1 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffers.s0Dim0 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffers.s0Dim1 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffers.s1Dim0 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffers.s1Dim1 = std::make_shared<multiBoxWithOrderIndex>();
 
-    long long sizeLeft = std::ceil((splitResult.bestIndex - 2) / 2.0) * S;
-    long long sizeRight = this->size - sizeLeft;
-    size_t SSplit0 = sizeLeft <= S ? std::ceil(sizeLeft / (double) M) : S;
-    size_t SSplit1 = sizeRight <= S ? std::ceil(sizeRight / (double) M) : S;
-    /*SSplit0 = 6251;
-    SSplit1 = 6251;*/
+    splitBuffers.s0SmallDim0 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffers.s0SmallDim1 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffers.s1SmallDim0 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffers.s1SmallDim1 = std::make_shared<multiBoxWithOrderIndex>();
 
-    /*if (sizeLeft % (int)std::ceil(this->size / (float) M) != 0 || sizeRight % (int)std::ceil(this->size / (float) M) != 0) {
-        int fdg = 0;
-    }*/
-    //long long iLimit = std::ceil(this->size / S);
+    std::pair<boxGeo, boxGeo> boundingBoxes = PerformSplit(splitResult, splitBuffers, M, S);
 
-    double globalMinXS0 = -1;
-    double globalMinYS0 = -1;
-    double globalMaxXS0 = -1;
-    double globalMaxYS0 = -1;
-
-    double globalMinXS1 = -1;
-    double globalMinYS1 = -1;
-    double globalMaxXS1 = -1;
-    double globalMaxYS1 = -1;
-
-    // placeholder
-    if (splitResult.bestDim == 0) {
-        s0SmallDim0->push_back((*this->rectanglesD0InRam)[0]);
-        s0SmallDim0->push_back(splitResult.bestLastElement);
-        s1SmallDim0->push_back(splitResult.bestElement);
-        s1SmallDim0->push_back((*this->rectanglesD0InRam)[this->rectanglesD0InRam->size() - 1]);
-        s0SmallDim1->push_back(rTreeValueWithOrderIndex());
-        s0SmallDim1->push_back(rTreeValueWithOrderIndex());
-        s1SmallDim1->push_back(rTreeValueWithOrderIndex());
-        s1SmallDim1->push_back(rTreeValueWithOrderIndex());
-    } else {
-        s0SmallDim1->push_back((*this->rectanglesD1InRam)[0]);
-        s0SmallDim1->push_back(splitResult.bestLastElement);
-        s1SmallDim1->push_back(splitResult.bestElement);
-        s1SmallDim1->push_back((*this->rectanglesD1InRam)[this->rectanglesD1InRam->size() - 1]);
-        s0SmallDim0->push_back(rTreeValueWithOrderIndex());
-        s0SmallDim0->push_back(rTreeValueWithOrderIndex());
-        s1SmallDim0->push_back(rTreeValueWithOrderIndex());
-        s1SmallDim0->push_back(rTreeValueWithOrderIndex());
-    }
-
-    long long currentXSplit0 = 0;
-    long long currentXSplit1 = 0;
-    for (rTreeValueWithOrderIndex element : *this->rectanglesD0InRam) {
-        if ((splitResult.bestDim == 0 && element.second.first < splitResult.bestElement.second.first)
-            || (splitResult.bestDim == 1 && element.second.second < splitResult.bestElement.second.second)) {
-            // split 0
-
-            s0Dim0->push_back(element);
-            if (((currentXSplit0 + 1) % SSplit0 == 0 && (currentXSplit0 + 1) / SSplit0 >= 1 && (currentXSplit0 + 1) / SSplit0 < M)
-                || (currentXSplit0 % SSplit0 == 0 && currentXSplit0 / SSplit0 >= 1 && currentXSplit0 / SSplit0 < M)) {
-                // index i * S - 1 or i * S
-                s0SmallDim0->push_back(element);
-            }
-
-            if (globalMinXS0 == -1 || element.first.first.min_corner().get<0>() < globalMinXS0) {
-                globalMinXS0 = element.first.first.min_corner().get<0>();
-            }
-            if (globalMinYS0 == -1 || element.first.first.min_corner().get<1>() < globalMinYS0) {
-                globalMinYS0 = element.first.first.min_corner().get<1>();
-            }
-            if (element.first.first.max_corner().get<0>() > globalMaxXS0) {
-                globalMaxXS0 = element.first.first.max_corner().get<0>();
-            }
-            if (element.first.first.max_corner().get<1>() > globalMaxYS0) {
-                globalMaxYS0 = element.first.first.max_corner().get<1>();
-            }
-
-            currentXSplit0++;
-        } else {
-            // split 1
-
-            s1Dim0->push_back(element);
-            if (((currentXSplit1 + 1) % SSplit1 == 0 && (currentXSplit1 + 1) / SSplit1 >= 1 && (currentXSplit1 + 1) / SSplit1 < M)
-                || (currentXSplit1 % SSplit1 == 0 && currentXSplit1 / SSplit1 >= 1 && currentXSplit1 / SSplit1 < M)) {
-                // index i * S - 1 or i * S
-                s1SmallDim0->push_back(element);
-            }
-
-            if (globalMinXS1 == -1 || element.first.first.min_corner().get<0>() < globalMinXS1) {
-                globalMinXS1 = element.first.first.min_corner().get<0>();
-            }
-            if (globalMinYS1 == -1 || element.first.first.min_corner().get<1>() < globalMinYS1) {
-                globalMinYS1 = element.first.first.min_corner().get<1>();
-            }
-            if (element.first.first.max_corner().get<0>() > globalMaxXS1) {
-                globalMaxXS1 = element.first.first.max_corner().get<0>();
-            }
-            if (element.first.first.max_corner().get<1>() > globalMaxYS1) {
-                globalMaxYS1 = element.first.first.max_corner().get<1>();
-            }
-
-            currentXSplit1++;
-        }
-    }
-
-    long long currentYSplit0 = 0;
-    long long currentYSplit1 = 0;
-    for (rTreeValueWithOrderIndex element : *this->rectanglesD1InRam) {
-        if ((splitResult.bestDim == 0 && element.second.first < splitResult.bestElement.second.first)
-            || (splitResult.bestDim == 1 && element.second.second < splitResult.bestElement.second.second)) {
-            // split 0
-
-            s0Dim1->push_back(element);
-            if (((currentYSplit0 + 1) % SSplit0 == 0 && (currentYSplit0 + 1) / SSplit0 >= 1 && (currentYSplit0 + 1) / SSplit0 < M)
-                || (currentYSplit0 % SSplit0 == 0 && currentYSplit0 / SSplit0 >= 1 && currentYSplit0 / SSplit0 < M)) {
-                // index i * S - 1 or i * S
-                s0SmallDim1->push_back(element);
-            }
-
-            currentYSplit0++;
-        } else {
-            // split 1
-
-            s1Dim1->push_back(element);
-            if (((currentYSplit1 + 1) % SSplit1 == 0 && (currentYSplit1 + 1) / SSplit1 >= 1 && (currentYSplit1 + 1) / SSplit1 < M)
-                || (currentYSplit1 % SSplit1 == 0 && currentYSplit1 / SSplit1 >= 1 && currentYSplit1 / SSplit1 < M)) {
-                // index i * S - 1 or i * S
-                s1SmallDim1->push_back(element);
-            }
-
-            currentYSplit1++;
-        }
-    }
-
-    if (s0Dim0->size() != s0Dim1->size() || s1Dim0->size() != s1Dim1->size() || s0Dim0->size() == 0 || s1Dim0->size() == 0)
-    {
-        long long a = s0Dim0->size();
-        long long b = s0Dim1->size();
-        long long c = s1Dim0->size();
-        long long d = s1Dim1->size();
-        long long e = this->rectanglesD0InRam->size();
-        long long f = this->rectanglesD1InRam->size();
-        bool test = true;
-    }
-    // replace the placeholder
-    if (splitResult.bestDim == 0) {
-        (*s0SmallDim1)[0] = (*s0Dim1)[0];
-        (*s0SmallDim1)[1] = (*s0Dim1)[s0Dim1->size() - 1];
-        (*s1SmallDim1)[0] = (*s1Dim1)[0];
-        (*s1SmallDim1)[1] = (*s1Dim1)[s1Dim1->size() - 1];
-    } else {
-        (*s0SmallDim0)[0] = (*s0Dim0)[0];
-        (*s0SmallDim0)[1] = (*s0Dim0)[s0Dim0->size() - 1];
-        (*s1SmallDim0)[0] = (*s1Dim0)[0];
-        (*s1SmallDim0)[1] = (*s1Dim0)[s1Dim0->size() - 1];
-    }
-
-    if (s0SmallDim0->size() <= 2 || s0SmallDim1->size() <= 2 || s1SmallDim0->size() <= 2 || s1SmallDim1->size() <= 2) {
-        long long a = s0SmallDim0->size();
-        long long b = s0SmallDim1->size();
-        long long c = s1SmallDim0->size();
-        long long d = s1SmallDim1->size();
-        long long e = this->rectanglesD0InRam->size();
-        long long f = this->rectanglesD1InRam->size();
-        bool test = true;
-    }
-
-    split0.CreateOrderedBoxesInRam(s0Dim0, s0Dim1, s0SmallDim0, s0SmallDim1, Rtree::createBoundingBox(globalMinXS0, globalMinYS0, globalMaxXS0, globalMaxYS0));
-    split1.CreateOrderedBoxesInRam(s1Dim0, s1Dim1, s1SmallDim0, s1SmallDim1, Rtree::createBoundingBox(globalMinXS1, globalMinYS1, globalMaxXS1, globalMaxYS1));
+    split0.CreateOrderedBoxesInRam(splitBuffers.s0Dim0, splitBuffers.s0Dim1, splitBuffers.s0SmallDim0, splitBuffers.s0SmallDim1, boundingBoxes.first);
+    split1.CreateOrderedBoxesInRam(splitBuffers.s1Dim0, splitBuffers.s1Dim1, splitBuffers.s1SmallDim0, splitBuffers.s1SmallDim1, boundingBoxes.second);
 
     (*this->rectanglesD0InRam).clear();
     (*this->rectanglesD1InRam).clear();
@@ -1117,75 +811,91 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestOnDisk(const std:
 
     struct SplitResult splitResult = this->GetBestSplit();
 
+    struct SplitBuffersDisk splitBuffers;
+    struct SplitBuffersRam splitBuffersRam;
+
     // perfrom the split
+    long long sizeLeft = std::ceil((splitResult.bestIndex - 2) / 2.0) * S;
+    long long sizeRight = this->size - sizeLeft;
+    long long split0ByteSize = sizeLeft * (4 * sizeof(double) + sizeof(uint64_t) + 2 * sizeof(long long));
+    long long split1ByteSize = sizeRight * (4 * sizeof(double) + sizeof(uint64_t) + 2 * sizeof(long long));
+    bool split0InRam = split0ByteSize * 4 < maxBuildingRamUsage;
+    bool split1InRam = split1ByteSize * 4 < maxBuildingRamUsage;
+
+    splitBuffersRam.s0SmallDim0 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffersRam.s0SmallDim1 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffersRam.s1SmallDim0 = std::make_shared<multiBoxWithOrderIndex>();
+    splitBuffersRam.s1SmallDim1 = std::make_shared<multiBoxWithOrderIndex>();
+
+    if (!split0InRam) {
+        splitBuffers.split0Dim0File = { std::ofstream(filePath + ".0.dim0.tmp", std::ios::binary) };
+        splitBuffers.split0Dim1File = { std::ofstream(filePath + ".0.dim1.tmp", std::ios::binary) };
+    } else {
+        splitBuffersRam.s0Dim0 = std::make_shared<multiBoxWithOrderIndex>();
+        splitBuffersRam.s0Dim1 = std::make_shared<multiBoxWithOrderIndex>();
+    }
+
+    if (!split1InRam) {
+        splitBuffers.split1Dim0File = { std::ofstream(filePath + ".1.dim0.tmp", std::ios::binary) };
+        splitBuffers.split1Dim1File = { std::ofstream(filePath + ".1.dim1.tmp", std::ios::binary) };
+    } else {
+        splitBuffersRam.s1Dim0 = std::make_shared<multiBoxWithOrderIndex>();
+        splitBuffersRam.s1Dim1 = std::make_shared<multiBoxWithOrderIndex>();
+    }
+
+    splitBuffers.splitBuffersRam = splitBuffersRam;
+
+    std::pair<boxGeo, boxGeo> boundingBoxes = PerformSplit(splitResult, splitBuffers, M, S, maxBuildingRamUsage);
+
+    if (!split0InRam) {
+        splitBuffers.split0Dim0File.value().close();
+        splitBuffers.split0Dim1File.value().close();
+
+        split0.CreateOrderedBoxesOnDisk(filePath + ".0.dim0", filePath + ".0.dim1", splitBuffers.splitBuffersRam.s0SmallDim0, splitBuffers.splitBuffersRam.s0SmallDim1, sizeLeft, boundingBoxes.first);
+    } else {
+        split0.CreateOrderedBoxesInRam(splitBuffers.splitBuffersRam.s0Dim0, splitBuffers.splitBuffersRam.s0Dim1, splitBuffers.splitBuffersRam.s0SmallDim0, splitBuffers.splitBuffersRam.s0SmallDim1, boundingBoxes.first);
+    }
+
+    if (!split1InRam) {
+        splitBuffers.split1Dim0File.value().close();
+        splitBuffers.split1Dim1File.value().close();
+
+        split1.CreateOrderedBoxesOnDisk(filePath + ".1.dim0", filePath + ".1.dim1", splitBuffers.splitBuffersRam.s1SmallDim0, splitBuffers.splitBuffersRam.s1SmallDim1, sizeRight, boundingBoxes.second);
+    } else {
+        split1.CreateOrderedBoxesInRam(splitBuffers.splitBuffersRam.s1Dim0, splitBuffers.splitBuffersRam.s1Dim1, splitBuffers.splitBuffersRam.s1SmallDim0, splitBuffers.splitBuffersRam.s1SmallDim1, boundingBoxes.second);
+    }
+
+    std::remove(this->rectanglesD0OnDisk.c_str());
+    std::remove(this->rectanglesD1OnDisk.c_str());
+
+    return std::make_pair(split0, split1);
+}
+
+std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, SplitBuffersRam& splitBuffersRam, size_t M, size_t S) {
+    struct SplitBuffersDisk splitBuffersDisk;
+
+    splitBuffersDisk.splitBuffersRam = splitBuffersRam;
+    splitBuffersDisk.split0Dim0File = {};
+    splitBuffersDisk.split0Dim1File = {};
+    splitBuffersDisk.split1Dim0File = {};
+    splitBuffersDisk.split1Dim1File = {};
+
+    std::pair<boxGeo, boxGeo> boundingBoxes = PerformSplit(splitResult, splitBuffersDisk, M, S, 0);
+
+    splitBuffersRam = splitBuffersDisk.splitBuffersRam;
+
+    return boundingBoxes;
+}
+
+std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, SplitBuffersDisk& splitBuffers, size_t M, size_t S, long long maxBuildingRamUsage) {
     long long sizeLeft = std::ceil((splitResult.bestIndex - 2) / 2.0) * S;
     long long sizeRight = this->size - sizeLeft;
     size_t SSplit0 = sizeLeft <= S ? std::ceil(sizeLeft / (double) M) : S;
     size_t SSplit1 = sizeRight <= S ? std::ceil(sizeRight / (double) M) : S;
     long long split0ByteSize = sizeLeft * (4 * sizeof(double) + sizeof(uint64_t) + 2 * sizeof(long long));
     long long split1ByteSize = sizeRight * (4 * sizeof(double) + sizeof(uint64_t) + 2 * sizeof(long long));
-    bool split0InRam = split0ByteSize * 4 < maxBuildingRamUsage;
-    bool split1InRam = split1ByteSize * 4 < maxBuildingRamUsage;
-
-    std::shared_ptr<multiBoxWithOrderIndex> split0Dim0InRam = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> split0Dim1InRam = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> split1Dim0InRam = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> split1Dim1InRam = std::make_shared<multiBoxWithOrderIndex>();
-    std::ofstream split0Dim0File;
-    std::ofstream split0Dim1File;
-    std::shared_ptr<multiBoxWithOrderIndex> split0Dim0Small = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> split0Dim1Small = std::make_shared<multiBoxWithOrderIndex>();
-    std::ofstream split1Dim0File;
-    std::ofstream split1Dim1File;
-    std::shared_ptr<multiBoxWithOrderIndex> split1Dim0Small = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> split1Dim1Small = std::make_shared<multiBoxWithOrderIndex>();
-
-    if (!split0InRam) {
-        split0Dim0File = std::ofstream(filePath + ".0.dim0.tmp", std::ios::binary);
-        split0Dim1File = std::ofstream(filePath + ".0.dim1.tmp", std::ios::binary);
-    }
-
-    if (splitResult.bestDim == 0) {
-        split0Dim0Small->push_back(splitResult.bestMinElement);
-        split0Dim0Small->push_back(splitResult.bestLastElement);
-        split1Dim0Small->push_back(splitResult.bestElement);
-        split1Dim0Small->push_back(splitResult.bestMaxElement);
-
-        // placeholder
-        split0Dim1Small->push_back(rTreeValueWithOrderIndex());
-        split0Dim1Small->push_back(rTreeValueWithOrderIndex());
-        split1Dim1Small->push_back(rTreeValueWithOrderIndex());
-        split1Dim1Small->push_back(rTreeValueWithOrderIndex());
-    } else {
-        split0Dim1Small->push_back(splitResult.bestMinElement);
-        split0Dim1Small->push_back(splitResult.bestLastElement);
-        split1Dim1Small->push_back(splitResult.bestElement);
-        split1Dim1Small->push_back(splitResult.bestMaxElement);
-
-        // placeholder
-        split0Dim0Small->push_back(rTreeValueWithOrderIndex());
-        split0Dim0Small->push_back(rTreeValueWithOrderIndex());
-        split1Dim0Small->push_back(rTreeValueWithOrderIndex());
-        split1Dim0Small->push_back(rTreeValueWithOrderIndex());
-    }
-
-    if (!split1InRam) {
-        split1Dim0File = std::ofstream(filePath + ".1.dim0.tmp", std::ios::binary);
-        split1Dim1File = std::ofstream(filePath + ".1.dim1.tmp", std::ios::binary);
-    }
-
-    rTreeValueWithOrderIndex minSplit0OtherDim;
-    rTreeValueWithOrderIndex maxSplit0OtherDim;
-    rTreeValueWithOrderIndex minSplit1OtherDim;
-    rTreeValueWithOrderIndex maxSplit1OtherDim;
-
-    double minX;
-    double minY;
-    double maxX;
-    double maxY;
-    uint64_t id;
-    long long orderX;
-    long long orderY;
+    bool split0InRam = maxBuildingRamUsage == 0 || split0ByteSize * 4 < maxBuildingRamUsage;
+    bool split1InRam = maxBuildingRamUsage == 0 || split1ByteSize * 4 < maxBuildingRamUsage;
 
     double globalMinXS0 = -1;
     double globalMinYS0 = -1;
@@ -1197,220 +907,265 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestOnDisk(const std:
     double globalMaxXS1 = -1;
     double globalMaxYS1 = -1;
 
-    std::ifstream dim0WholeFile = std::ifstream(this->rectanglesD0OnDisk, std::ios::binary);
-    dim0WholeFile.seekg (0, std::ifstream::end);
-    long long fileLength = dim0WholeFile.tellg();
-    dim0WholeFile.seekg (0, std::ifstream::beg);
+    rTreeValueWithOrderIndex minSplit0OtherDim;
+    rTreeValueWithOrderIndex maxSplit0OtherDim;
+    rTreeValueWithOrderIndex minSplit1OtherDim;
+    rTreeValueWithOrderIndex maxSplit1OtherDim;
 
+    if (splitResult.bestDim == 0) {
+        splitBuffers.splitBuffersRam.s0SmallDim0->push_back(splitResult.bestMinElement);
+        splitBuffers.splitBuffersRam.s0SmallDim0->push_back(splitResult.bestLastElement);
+        splitBuffers.splitBuffersRam.s1SmallDim0->push_back(splitResult.bestElement);
+        splitBuffers.splitBuffersRam.s1SmallDim0->push_back(splitResult.bestMaxElement);
+
+        // placeholder
+        splitBuffers.splitBuffersRam.s0SmallDim1->push_back(rTreeValueWithOrderIndex());
+        splitBuffers.splitBuffersRam.s0SmallDim1->push_back(rTreeValueWithOrderIndex());
+        splitBuffers.splitBuffersRam.s1SmallDim1->push_back(rTreeValueWithOrderIndex());
+        splitBuffers.splitBuffersRam.s1SmallDim1->push_back(rTreeValueWithOrderIndex());
+    } else {
+        splitBuffers.splitBuffersRam.s0SmallDim1->push_back(splitResult.bestMinElement);
+        splitBuffers.splitBuffersRam.s0SmallDim1->push_back(splitResult.bestLastElement);
+        splitBuffers.splitBuffersRam.s1SmallDim1->push_back(splitResult.bestElement);
+        splitBuffers.splitBuffersRam.s1SmallDim1->push_back(splitResult.bestMaxElement);
+
+        // placeholder
+        splitBuffers.splitBuffersRam.s0SmallDim0->push_back(rTreeValueWithOrderIndex());
+        splitBuffers.splitBuffersRam.s0SmallDim0->push_back(rTreeValueWithOrderIndex());
+        splitBuffers.splitBuffersRam.s1SmallDim0->push_back(rTreeValueWithOrderIndex());
+        splitBuffers.splitBuffersRam.s1SmallDim0->push_back(rTreeValueWithOrderIndex());
+    }
+
+    std::optional<rTreeValueWithOrderIndex> elementOpt;
+    std::optional<FileReader> fileReaderDim0;
+    std::optional<FileReader> fileReaderDim1;
+    if (!this->workInRam) {
+        fileReaderDim0 = { FileReader(this->rectanglesD0OnDisk) };
+        fileReaderDim1 = { FileReader(this->rectanglesD1OnDisk) };
+    }
     long long currentXSplit0 = 0;
     long long currentXSplit1 = 0;
-    while (dim0WholeFile.tellg() < fileLength) {
-        dim0WholeFile.read(reinterpret_cast<char*>(&minX), sizeof(double));
-        dim0WholeFile.read(reinterpret_cast<char*>(&minY), sizeof(double));
-        dim0WholeFile.read(reinterpret_cast<char*>(&maxX), sizeof(double));
-        dim0WholeFile.read(reinterpret_cast<char*>(&maxY), sizeof(double));
-        dim0WholeFile.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
-        dim0WholeFile.read(reinterpret_cast<char*>(&orderX), sizeof(long long));
-        dim0WholeFile.read(reinterpret_cast<char*>(&orderY), sizeof(long long));
-
-        boxGeo box = Rtree::createBoundingBox(minX, minY, maxX, maxY);
-        rTreeValue boxWithId = std::make_pair(box, id);
-        rTreeValueWithOrderIndex currentElement = std::make_pair(boxWithId, std::make_pair(orderX, orderY));
-
-        if ((splitResult.bestDim == 0 && currentElement.second.first < splitResult.bestElement.second.first)
-        || (splitResult.bestDim == 1 && currentElement.second.second < splitResult.bestElement.second.second)) {
-            // it's in split 0
-            if (((currentXSplit0 + 1) % SSplit0 == 0 && (currentXSplit0 + 1) / SSplit0 >= 1 && (currentXSplit0 + 1) / SSplit0 < M)
-                || (currentXSplit0 % SSplit0 == 0 && currentXSplit0 / SSplit0 >= 1 && currentXSplit0 / SSplit0 < M)) {
-                // index i * S - 1 or i * S
-                split0Dim0Small->push_back(currentElement);
-            }
-
-            if (split0InRam) {
-                split0Dim0InRam->push_back(currentElement);
-            } else {
-                Rtree::SaveEntryWithOrderIndex(currentElement, split0Dim0File);
-            }
-
-            if (globalMinXS0 == -1 || currentElement.first.first.min_corner().get<0>() < globalMinXS0) {
-                globalMinXS0 = currentElement.first.first.min_corner().get<0>();
-            }
-            if (globalMinYS0 == -1 || currentElement.first.first.min_corner().get<1>() < globalMinYS0) {
-                globalMinYS0 = currentElement.first.first.min_corner().get<1>();
-            }
-            if (currentElement.first.first.max_corner().get<0>() > globalMaxXS0) {
-                globalMaxXS0 = currentElement.first.first.max_corner().get<0>();
-            }
-            if (currentElement.first.first.max_corner().get<1>() > globalMaxYS0) {
-                globalMaxYS0 = currentElement.first.first.max_corner().get<1>();
-            }
-
-            if (splitResult.bestDim == 1) {
-                if (currentXSplit0 == 0) {
-                    minSplit0OtherDim = currentElement;
-                    maxSplit0OtherDim = currentElement;
-                }
-                if (currentElement.second.first > maxSplit0OtherDim.second.first) {
-                    maxSplit0OtherDim = currentElement;
-                }
-            }
-
-            currentXSplit0++;
-        } else {
-            // it's in split 1
-            if (((currentXSplit1 + 1) % SSplit1 == 0 && (currentXSplit1 + 1) / SSplit1 >= 1 && (currentXSplit1 + 1) / SSplit1 < M)
-                || (currentXSplit1 % SSplit1 == 0 && currentXSplit1 / SSplit1 >= 1 && currentXSplit1 / SSplit1 < M)) {
-                // index i * S - 1 or i * S
-                split1Dim0Small->push_back(currentElement);
-            }
-
-            if (split1InRam) {
-                split1Dim0InRam->push_back(currentElement);
-            } else {
-                Rtree::SaveEntryWithOrderIndex(currentElement, split1Dim0File);
-            }
-
-            if (globalMinXS1 == -1 || currentElement.first.first.min_corner().get<0>() < globalMinXS1) {
-                globalMinXS1 = currentElement.first.first.min_corner().get<0>();
-            }
-            if (globalMinYS1 == -1 || currentElement.first.first.min_corner().get<1>() < globalMinYS1) {
-                globalMinYS1 = currentElement.first.first.min_corner().get<1>();
-            }
-            if (currentElement.first.first.max_corner().get<0>() > globalMaxXS1) {
-                globalMaxXS1 = currentElement.first.first.max_corner().get<0>();
-            }
-            if (currentElement.first.first.max_corner().get<1>() > globalMaxYS1) {
-                globalMaxYS1 = currentElement.first.first.max_corner().get<1>();
-            }
-
-            if (splitResult.bestDim == 1) {
-                if (currentXSplit1 == 0) {
-                    minSplit1OtherDim = currentElement;
-                    maxSplit1OtherDim = currentElement;
-                }
-                if (currentElement.second.first > maxSplit1OtherDim.second.first) {
-                    maxSplit1OtherDim = currentElement;
-                }
-            }
-
-            currentXSplit1++;
-        }
-    }
-    dim0WholeFile.close();
-
-    std::ifstream dim1WholeFile = std::ifstream(this->rectanglesD1OnDisk, std::ios::binary);
-    dim1WholeFile.seekg (0, std::ifstream::end);
-    fileLength = dim1WholeFile.tellg();
-    dim1WholeFile.seekg (0, std::ifstream::beg);
-
     long long currentYSplit0 = 0;
     long long currentYSplit1 = 0;
-    while (dim1WholeFile.tellg() < fileLength) {
-        dim1WholeFile.read(reinterpret_cast<char*>(&minX), sizeof(double));
-        dim1WholeFile.read(reinterpret_cast<char*>(&minY), sizeof(double));
-        dim1WholeFile.read(reinterpret_cast<char*>(&maxX), sizeof(double));
-        dim1WholeFile.read(reinterpret_cast<char*>(&maxY), sizeof(double));
-        dim1WholeFile.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
-        dim1WholeFile.read(reinterpret_cast<char*>(&orderX), sizeof(long long));
-        dim1WholeFile.read(reinterpret_cast<char*>(&orderY), sizeof(long long));
+    for (size_t dim = 0; dim < 2; dim++) {
+        long long i = 0;
 
-        boxGeo box = Rtree::createBoundingBox(minX, minY, maxX, maxY);
-        rTreeValue boxWithId = std::make_pair(box, id);
-        rTreeValueWithOrderIndex currentElement = std::make_pair(boxWithId, std::make_pair(orderX, orderY));
+        if (!this->workInRam) {
+            if (dim == 0)
+                elementOpt = fileReaderDim0.value().GetNextElement();
+            if (dim == 1)
+                elementOpt = fileReaderDim1.value().GetNextElement();
+        }
 
-        if ((splitResult.bestDim == 1 && currentElement.second.second < splitResult.bestElement.second.second)
-        || (splitResult.bestDim == 0 && currentElement.second.first < splitResult.bestElement.second.first)) {
-            // it's in split 0
-            if (((currentYSplit0 + 1) % SSplit0 == 0 && (currentYSplit0 + 1) / SSplit0 >= 1 && (currentYSplit0 + 1) / SSplit0 < M)
-                || (currentYSplit0 % SSplit0 == 0 && currentYSplit0 / SSplit0 >= 1 && currentYSplit0 / SSplit0 < M)) {
-                // index i * S - 1 or i * S
-                split0Dim1Small->push_back(currentElement);
-            }
-
-            if (split0InRam) {
-                split0Dim1InRam->push_back(currentElement);
+        while ((this->workInRam && i < this->size) || (!this->workInRam && elementOpt)) {
+            rTreeValueWithOrderIndex element;
+            if (this->workInRam) {
+                element = dim == 0 ? (*this->rectanglesD0InRam)[i] : (*this->rectanglesD1InRam)[i];
             } else {
-                Rtree::SaveEntryWithOrderIndex(currentElement, split0Dim1File);
+                element = elementOpt.value();
             }
 
-            if (splitResult.bestDim == 0) {
-                if (currentYSplit0 == 0) {
-                    minSplit0OtherDim = currentElement;
-                    maxSplit0OtherDim = currentElement;
+            if ((splitResult.bestDim == 0 && element.second.first < splitResult.bestElement.second.first)
+                || (splitResult.bestDim == 1 && element.second.second < splitResult.bestElement.second.second)) {
+                // split 0
+
+                if (dim == 0) {
+                    if (split0InRam || this->workInRam) {
+                        splitBuffers.splitBuffersRam.s0Dim0->push_back(element);
+                    } else {
+                        Rtree::SaveEntryWithOrderIndex(element, splitBuffers.split0Dim0File.value());
+                    }
+                    if (((currentXSplit0 + 1) % SSplit0 == 0 && (currentXSplit0 + 1) / SSplit0 >= 1 && (currentXSplit0 + 1) / SSplit0 < M)
+                        || (currentXSplit0 % SSplit0 == 0 && currentXSplit0 / SSplit0 >= 1 && currentXSplit0 / SSplit0 < M)) {
+                        // index i * S - 1 or i * S
+                        splitBuffers.splitBuffersRam.s0SmallDim0->push_back(element);
+                    }
+
+                    if (globalMinXS0 == -1 || element.first.first.min_corner().get<0>() < globalMinXS0) {
+                        globalMinXS0 = element.first.first.min_corner().get<0>();
+                    }
+                    if (globalMinYS0 == -1 || element.first.first.min_corner().get<1>() < globalMinYS0) {
+                        globalMinYS0 = element.first.first.min_corner().get<1>();
+                    }
+                    if (element.first.first.max_corner().get<0>() > globalMaxXS0) {
+                        globalMaxXS0 = element.first.first.max_corner().get<0>();
+                    }
+                    if (element.first.first.max_corner().get<1>() > globalMaxYS0) {
+                        globalMaxYS0 = element.first.first.max_corner().get<1>();
+                    }
+
+                    if (splitResult.bestDim == 1) {
+                        if (currentXSplit0 == 0) {
+                            minSplit0OtherDim = element;
+                            maxSplit0OtherDim = element;
+                        }
+                        if (element.second.first > maxSplit0OtherDim.second.first) {
+                            maxSplit0OtherDim = element;
+                        }
+                    }
+
+                    currentXSplit0++;
+                } else {
+                    if (split0InRam || this->workInRam) {
+                        splitBuffers.splitBuffersRam.s0Dim1->push_back(element);
+                    } else {
+                        Rtree::SaveEntryWithOrderIndex(element, splitBuffers.split0Dim1File.value());
+                    }
+
+                    if (((currentYSplit0 + 1) % SSplit0 == 0 && (currentYSplit0 + 1) / SSplit0 >= 1 && (currentYSplit0 + 1) / SSplit0 < M)
+                        || (currentYSplit0 % SSplit0 == 0 && currentYSplit0 / SSplit0 >= 1 && currentYSplit0 / SSplit0 < M)) {
+                        // index i * S - 1 or i * S
+                        splitBuffers.splitBuffersRam.s0SmallDim1->push_back(element);
+                    }
+
+                    if (splitResult.bestDim == 0) {
+                        if (currentYSplit0 == 0) {
+                            minSplit0OtherDim = element;
+                            maxSplit0OtherDim = element;
+                        }
+                        if (element.second.first > maxSplit0OtherDim.second.first) {
+                            maxSplit0OtherDim = element;
+                        }
+                    }
+
+                    currentYSplit0++;
                 }
-                if (currentElement.second.second > maxSplit0OtherDim.second.second) {
-                    maxSplit0OtherDim = currentElement;
-                }
-            }
-
-            currentYSplit0++;
-        } else {
-            // it's in split 1
-            if (((currentYSplit1 + 1) % SSplit1 == 0 && (currentYSplit1 + 1) / SSplit1 >= 1 && (currentYSplit1 + 1) / SSplit1 < M)
-                || (currentYSplit1 % SSplit1 == 0 && currentYSplit1 / SSplit1 >= 1 && currentYSplit1 / SSplit1 < M)) {
-                // index i * S - 1 or i * S
-                split1Dim1Small->push_back(currentElement);
-            }
-
-            if (split1InRam) {
-                split1Dim1InRam->push_back(currentElement);
             } else {
-                Rtree::SaveEntryWithOrderIndex(currentElement, split1Dim1File);
-            }
+                // split 1
 
-            if (splitResult.bestDim == 0) {
-                if (currentYSplit1 == 0) {
-                    minSplit1OtherDim = currentElement;
-                    maxSplit1OtherDim = currentElement;
-                }
-                if (currentElement.second.second > maxSplit1OtherDim.second.second) {
-                    maxSplit1OtherDim = currentElement;
+                if (dim == 0) {
+                    if (split1InRam || this->workInRam) {
+                        splitBuffers.splitBuffersRam.s1Dim0->push_back(element);
+                    } else {
+                        Rtree::SaveEntryWithOrderIndex(element, splitBuffers.split1Dim0File.value());
+                    }
+                    if (((currentXSplit1 + 1) % SSplit1 == 0 && (currentXSplit1 + 1) / SSplit1 >= 1 && (currentXSplit1 + 1) / SSplit1 < M)
+                        || (currentXSplit1 % SSplit1 == 0 && currentXSplit1 / SSplit1 >= 1 && currentXSplit1 / SSplit1 < M)) {
+                        // index i * S - 1 or i * S
+                        splitBuffers.splitBuffersRam.s1SmallDim0->push_back(element);
+                    }
+
+                    if (globalMinXS1 == -1 || element.first.first.min_corner().get<0>() < globalMinXS1) {
+                        globalMinXS1 = element.first.first.min_corner().get<0>();
+                    }
+                    if (globalMinYS1 == -1 || element.first.first.min_corner().get<1>() < globalMinYS1) {
+                        globalMinYS1 = element.first.first.min_corner().get<1>();
+                    }
+                    if (element.first.first.max_corner().get<0>() > globalMaxXS1) {
+                        globalMaxXS1 = element.first.first.max_corner().get<0>();
+                    }
+                    if (element.first.first.max_corner().get<1>() > globalMaxYS1) {
+                        globalMaxYS1 = element.first.first.max_corner().get<1>();
+                    }
+
+                    if (splitResult.bestDim == 1) {
+                        if (currentXSplit1 == 0) {
+                            minSplit1OtherDim = element;
+                            maxSplit1OtherDim = element;
+                        }
+                        if (element.second.first > maxSplit1OtherDim.second.first) {
+                            maxSplit1OtherDim = element;
+                        }
+                    }
+
+                    currentXSplit1++;
+                } else {
+                    if (split1InRam || this->workInRam) {
+                        splitBuffers.splitBuffersRam.s1Dim1->push_back(element);
+                    } else {
+                        Rtree::SaveEntryWithOrderIndex(element, splitBuffers.split1Dim1File.value());
+                    }
+                    if (((currentYSplit1 + 1) % SSplit1 == 0 && (currentYSplit1 + 1) / SSplit1 >= 1 && (currentYSplit1 + 1) / SSplit1 < M)
+                        || (currentYSplit1 % SSplit1 == 0 && currentYSplit1 / SSplit1 >= 1 && currentYSplit1 / SSplit1 < M)) {
+                        // index i * S - 1 or i * S
+                        splitBuffers.splitBuffersRam.s1SmallDim1->push_back(element);
+                    }
+
+                    if (splitResult.bestDim == 0) {
+                        if (currentYSplit1 == 0) {
+                            minSplit1OtherDim = element;
+                            maxSplit1OtherDim = element;
+                        }
+                        if (element.second.first > maxSplit1OtherDim.second.first) {
+                            maxSplit1OtherDim = element;
+                        }
+                    }
+
+                    currentYSplit1++;
                 }
             }
+            i++;
 
-            currentYSplit1++;
+            if (!this->workInRam) {
+                if (dim == 0)
+                    elementOpt = fileReaderDim0.value().GetNextElement();
+                if (dim == 1)
+                    elementOpt = fileReaderDim1.value().GetNextElement();
+            }
         }
     }
-    dim1WholeFile.close();
 
-    // replace the placeholder with actual values
+    if (!this->workInRam) {
+        fileReaderDim0.value().Close();
+        fileReaderDim1.value().Close();
+    }
+
+    // replace the placeholder
     if (splitResult.bestDim == 0) {
-        (*split0Dim1Small)[0] = minSplit0OtherDim;
-        (*split0Dim1Small)[1] = maxSplit0OtherDim;
-
-        (*split1Dim1Small)[0] = minSplit1OtherDim;
-        (*split1Dim1Small)[1] = maxSplit1OtherDim;
+        (*splitBuffers.splitBuffersRam.s0SmallDim1)[0] = minSplit0OtherDim;
+        (*splitBuffers.splitBuffersRam.s0SmallDim1)[1] = maxSplit0OtherDim;
+        (*splitBuffers.splitBuffersRam.s1SmallDim1)[0] = minSplit1OtherDim;
+        (*splitBuffers.splitBuffersRam.s1SmallDim1)[1] = maxSplit1OtherDim;
     } else {
-        (*split0Dim0Small)[0] = minSplit0OtherDim;
-        (*split0Dim0Small)[1] = maxSplit0OtherDim;
-
-        (*split1Dim0Small)[0] = minSplit1OtherDim;
-        (*split1Dim0Small)[1] = maxSplit1OtherDim;
+        (*splitBuffers.splitBuffersRam.s0SmallDim0)[0] = minSplit0OtherDim;
+        (*splitBuffers.splitBuffersRam.s0SmallDim0)[1] = maxSplit0OtherDim;
+        (*splitBuffers.splitBuffersRam.s1SmallDim0)[0] = minSplit1OtherDim;
+        (*splitBuffers.splitBuffersRam.s1SmallDim0)[1] = maxSplit1OtherDim;
     }
 
     boxGeo boxSplit0 = Rtree::createBoundingBox(globalMinXS0, globalMinYS0, globalMaxXS0, globalMaxYS0);
     boxGeo boxSplit1 = Rtree::createBoundingBox(globalMinXS1, globalMinYS1, globalMaxXS1, globalMaxYS1);
 
-    if (!split0InRam) {
-        split0Dim0File.close();
-        split0Dim1File.close();
+    return std::make_pair(boxSplit0, boxSplit1);
+}
 
-        split0.CreateOrderedBoxesOnDisk(filePath + ".0.dim0", filePath + ".0.dim1", split0Dim0Small, split0Dim1Small, sizeLeft, boxSplit0);
+FileReader::FileReader(const std::string& filePath) {
+    this->filePath = filePath;
+
+    this->file = std::ifstream(this->filePath, std::ios::binary);
+    this->file.seekg (0, std::ifstream::end);
+    this->fileLength = this->file.tellg();
+    this->file.seekg (0, std::ifstream::beg);
+}
+
+std::optional<rTreeValueWithOrderIndex> FileReader::GetNextElement() {
+    if (this->file.tellg() < this->fileLength) {
+        double minX;
+        double minY;
+        double maxX;
+        double maxY;
+        uint64_t id;
+        long long orderX;
+        long long orderY;
+
+        this->file.read(reinterpret_cast<char*>(&minX), sizeof(double));
+        this->file.read(reinterpret_cast<char*>(&minY), sizeof(double));
+        this->file.read(reinterpret_cast<char*>(&maxX), sizeof(double));
+        this->file.read(reinterpret_cast<char*>(&maxY), sizeof(double));
+        this->file.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
+        this->file.read(reinterpret_cast<char*>(&orderX), sizeof(long long));
+        this->file.read(reinterpret_cast<char*>(&orderY), sizeof(long long));
+
+        boxGeo box = Rtree::createBoundingBox(minX, minY, maxX, maxY);
+        rTreeValue boxWithId = std::make_pair(box, id);
+        rTreeValueWithOrderIndex element = std::make_pair(boxWithId, std::make_pair(orderX, orderY));
+
+        return { element };
     } else {
-        split0.CreateOrderedBoxesInRam(split0Dim0InRam, split0Dim1InRam, split0Dim0Small, split0Dim1Small, boxSplit0);
+        return {};
     }
+}
 
-    if (!split1InRam) {
-        split1Dim0File.close();
-        split1Dim1File.close();
-
-        split1.CreateOrderedBoxesOnDisk(filePath + ".1.dim0", filePath + ".1.dim1", split1Dim0Small, split1Dim1Small, sizeRight, boxSplit1);
-    } else {
-        split1.CreateOrderedBoxesInRam(split1Dim0InRam, split1Dim1InRam, split1Dim0Small, split1Dim1Small, boxSplit1);
-    }
-
-    std::remove(this->rectanglesD0OnDisk.c_str());
-    std::remove(this->rectanglesD1OnDisk.c_str());
-
-    return std::make_pair(split0, split1);
+void FileReader::Close() {
+    this->file.close();
 }
