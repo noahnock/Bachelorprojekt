@@ -10,6 +10,7 @@
 #include <fstream>
 #include <filesystem>
 #include <optional>
+#include <limits>
 #include <boost/geometry.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
@@ -22,12 +23,42 @@ namespace bg = boost::geometry;
 
 using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::degree>>;
 using boxGeo = bg::model::box<pointGeo>;
-using rTreeValue = std::pair<boxGeo, long long>;
-using multiBoxGeo = std::vector<rTreeValue>;
-using rTreeValueWithOrderIndex = std::pair<rTreeValue, std::pair<long long, long long>>;
-using multiBoxWithOrderIndex = std::vector<rTreeValueWithOrderIndex>;
 
 using bg::make;
+
+struct rTreeValue {
+    boxGeo box{};
+    long long id;
+    rTreeValue(boxGeo box_, long long id_) {
+        box = box_;
+        id = id_;
+    }
+
+    rTreeValue() {}
+
+    template<class Archive>
+    void serialize(Archive & a, [[maybe_unused]]const unsigned int version) {
+        a & box;
+        a & id;
+    }
+};
+using multiBoxGeo = std::vector<rTreeValue>;
+
+struct rTreeValueWithOrderIndex {
+    boxGeo box{};
+    long long id;
+    long long orderX;
+    long long orderY;
+    rTreeValueWithOrderIndex(boxGeo box_, long long id_, long long orderX_, long long orderY_) {
+        box = box_;
+        id = id_;
+        orderX = orderX_;
+        orderY = orderY_;
+    }
+
+    rTreeValueWithOrderIndex() {};
+};
+using multiBoxWithOrderIndex = std::vector<rTreeValueWithOrderIndex>;
 
 struct SplitResult {
     double bestCost = -1;
@@ -157,6 +188,17 @@ public:
     void Close();
 };
 
+class FileReaderWithoutIndex {
+private:
+    std::string filePath;
+    std::ifstream file;
+    long long fileLength;
+public:
+    explicit FileReaderWithoutIndex(const std::string& filePath);
+    std::optional<rTreeValue> GetNextElement();
+    void Close();
+};
+
 namespace boost::serialization {
     template<class Archive>
     void save(Archive & a, const boxGeo & b, [[maybe_unused]]unsigned int version)
@@ -181,5 +223,56 @@ namespace boost::serialization {
     }
 }
 BOOST_SERIALIZATION_SPLIT_FREE(boxGeo);
+
+struct sortRuleLambdaX {
+    // comparison function
+    bool operator()(const rTreeValue& b1, const rTreeValue& b2) const {
+        double center1 = (b1.box.min_corner().get<0>() + b1.box.max_corner().get<0>()) / 2;
+        double center2 = (b2.box.min_corner().get<0>() + b2.box.max_corner().get<0>()) / 2;
+        return center1 < center2;
+    }
+
+    // Value that is strictly smaller than any input element.
+    static rTreeValue min_value() { return {Rtree::createBoundingBox(DBL_MIN, DBL_MIN, DBL_MIN, DBL_MIN), 0}; }
+
+    // Value that is strictly larger than any input element.
+    static rTreeValue max_value() { return {Rtree::createBoundingBox(DBL_MAX, DBL_MAX, DBL_MAX, DBL_MAX), 0}; }
+};
+
+struct sortRuleLambdaXWithIndex {
+    // comparison function
+    bool operator()(const rTreeValueWithOrderIndex& b1, const rTreeValueWithOrderIndex& b2) const {
+        double center1 = (b1.box.min_corner().get<0>() + b1.box.max_corner().get<0>()) / 2;
+        double center2 = (b2.box.min_corner().get<0>() + b2.box.max_corner().get<0>()) / 2;
+
+        if (b1.orderX == b2.orderX)
+            return center1 < center2;
+        return b1.orderX < b2.orderX;
+    }
+
+    // Value that is strictly smaller than any input element.
+    static rTreeValueWithOrderIndex min_value() { return {Rtree::createBoundingBox(DBL_MIN, DBL_MIN, DBL_MIN, DBL_MIN), 0, 0, 0}; }
+
+    // Value that is strictly larger than any input element.
+    static rTreeValueWithOrderIndex max_value() { return {Rtree::createBoundingBox(DBL_MAX, DBL_MAX, DBL_MAX, DBL_MAX), 0, LLONG_MAX, LLONG_MAX}; }
+};
+
+struct sortRuleLambdaYWithIndex {
+    // comparison function
+    bool operator()(const rTreeValueWithOrderIndex& b1, const rTreeValueWithOrderIndex& b2) const {
+        double center1 = (b1.box.min_corner().get<1>() + b1.box.max_corner().get<1>()) / 2;
+        double center2 = (b2.box.min_corner().get<1>() + b2.box.max_corner().get<1>()) / 2;
+
+        if (b1.orderY == b2.orderY)
+            return center1 < center2;
+        return b1.orderY < b2.orderY;
+    }
+
+    // Value that is strictly smaller than any input element.
+    static rTreeValueWithOrderIndex min_value() { return {Rtree::createBoundingBox(DBL_MIN, DBL_MIN, DBL_MIN, DBL_MIN), 0, 0, 0}; }
+
+    // Value that is strictly larger than any input element.
+    static rTreeValueWithOrderIndex max_value() { return {Rtree::createBoundingBox(DBL_MAX, DBL_MAX, DBL_MAX, DBL_MAX), 0, LLONG_MAX, LLONG_MAX}; }
+};
 
 #endif //BACHELORPROJEKT_RTREE_H

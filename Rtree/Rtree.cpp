@@ -2,34 +2,20 @@
 //                  Chair of Algorithms and Data Structures.
 //  Author: Noah Nock <noah.v.nock@gmail.com>
 
-#include "Rtree.h"
+#include "./Rtree.h"
 #include "../ExternalSorting.cpp"
-
-bool intersects(const boxGeo &b1, const boxGeo &b2) {
-    bool notIntersecting = b1.min_corner().get<0>() > b2.max_corner().get<0>() ||
-                           b2.min_corner().get<0>() > b1.max_corner().get<0>() ||
-                           b1.min_corner().get<1>() > b2.max_corner().get<1>() ||
-                           b2.min_corner().get<1>() > b1.max_corner().get<1>();
-
-    return !notIntersecting;
-}
 
 static void centerOrdering(multiBoxGeo& boxes, size_t dim) {
     if (dim == 0) {
         // order by centerX
-        auto sortRuleLambda = [] (rTreeValue b1, rTreeValue b2) -> bool
-        {
-            double center1 = (b1.first.min_corner().get<0>() + b1.first.max_corner().get<0>()) / 2;
-            double center2 = (b2.first.min_corner().get<0>() + b2.first.max_corner().get<0>()) / 2;
-            return center1 < center2;
-        };
+        sortRuleLambdaX comp;
 
-        std::sort(boxes.begin(), boxes.end(), sortRuleLambda);
+        std::sort(boxes.begin(), boxes.end(), comp);
     } else {
         // order by centerY
         auto sortRuleLambda = [](rTreeValue b1, rTreeValue b2) -> bool {
-            double center1 = (b1.first.min_corner().get<1>() + b1.first.max_corner().get<1>()) / 2;
-            double center2 = (b2.first.min_corner().get<1>() + b2.first.max_corner().get<1>()) / 2;
+            double center1 = (b1.box.min_corner().get<1>() + b1.box.max_corner().get<1>()) / 2;
+            double center2 = (b2.box.min_corner().get<1>() + b2.box.max_corner().get<1>()) / 2;
             return center1 < center2;
         };
 
@@ -40,38 +26,246 @@ static void centerOrdering(multiBoxGeo& boxes, size_t dim) {
 static void centerOrdering(multiBoxWithOrderIndex& boxes, size_t dim) {
     if (dim == 0) {
         // order by centerX
-        auto sortRuleLambda = [] (rTreeValueWithOrderIndex b1, rTreeValueWithOrderIndex b2) -> bool
-        {
-            double center1 = (b1.first.first.min_corner().get<0>() + b1.first.first.max_corner().get<0>()) / 2;
-            double center2 = (b2.first.first.min_corner().get<0>() + b2.first.first.max_corner().get<0>()) / 2;
+        sortRuleLambdaXWithIndex comp;
 
-            if (b1.second.first == b2.second.first)
-                return center1 < center2;
-            return b1.second.first < b2.second.first;
-        };
-
-        std::sort(boxes.begin(), boxes.end(), sortRuleLambda);
+        std::sort(boxes.begin(), boxes.end(), comp);
     } else {
         // order by centerY
-        auto sortRuleLambda = [](rTreeValueWithOrderIndex b1, rTreeValueWithOrderIndex b2) -> bool {
-            double center1 = (b1.first.first.min_corner().get<1>() + b1.first.first.max_corner().get<1>()) / 2;
-            double center2 = (b2.first.first.min_corner().get<1>() + b2.first.first.max_corner().get<1>()) / 2;
+        sortRuleLambdaYWithIndex comp;
 
-            if (b1.second.second == b2.second.second)
-                return center1 < center2;
-            return b1.second.second < b2.second.second;
-        };
-
-        std::sort(boxes.begin(), boxes.end(), sortRuleLambda);
+        std::sort(boxes.begin(), boxes.end(), comp);
     }
 }
 
+/*OrderedBoxes SortInput(const std::string& onDiskBase, size_t M, uintmax_t maxBuildingRamUsage, bool workInRam) {
+    OrderedBoxes orderedInputRectangles;
+
+    ad_utility::BackgroundStxxlSorter<rTreeValue, sortRuleLambdaX> sorterRectsD0Basic = ad_utility::BackgroundStxxlSorter<rTreeValue, sortRuleLambdaX>(std::ceil((maxBuildingRamUsage < 9999999999 ? maxBuildingRamUsage : 9999999999) / 3.0));
+    multiBoxGeo rectsD0Basic;
+
+    if (workInRam) {
+        rectsD0Basic = Rtree::LoadEntries(onDiskBase + ".boundingbox.tmp");
+        centerOrdering(rectsD0Basic, 0);
+    } else {
+        FileReaderWithoutIndex fileReaderRectsD0 = FileReaderWithoutIndex(onDiskBase + ".boundingbox.tmp");
+        std::optional<rTreeValue> rectD0Element = fileReaderRectsD0.GetNextElement();
+        while (rectD0Element) {
+            sorterRectsD0Basic.push(rectD0Element.value());
+            rectD0Element = fileReaderRectsD0.GetNextElement();
+        }
+        fileReaderRectsD0.Close();
+    }
+
+    long long xSize = 0;
+    double globalMinX = -1;
+    double globalMinY = -1;
+    double globalMaxX = -1;
+    double globalMaxY = -1;
+
+    ad_utility::BackgroundStxxlSorter<rTreeValueWithOrderIndex, sortRuleLambdaYWithIndex> sorterRectsD1 = ad_utility::BackgroundStxxlSorter<rTreeValueWithOrderIndex, sortRuleLambdaYWithIndex>(std::ceil((maxBuildingRamUsage < 9999999999 ? maxBuildingRamUsage : 9999999999) / 3.0));
+    std::shared_ptr<multiBoxWithOrderIndex> RectanglesD1WithOrder = std::make_shared<multiBoxWithOrderIndex>();
+
+    if (workInRam) {
+        for (rTreeValue element : rectsD0Basic) {
+            rTreeValueWithOrderIndex entry = rTreeValueWithOrderIndex(element.box, element.id, xSize, 0);
+            RectanglesD1WithOrder->push_back(entry);
+            xSize++;
+
+            if (globalMinX == -1 || element.box.min_corner().get<0>() < globalMinX) {
+                globalMinX = element.box.min_corner().get<0>();
+            }
+            if (globalMinY == -1 || element.box.min_corner().get<1>() < globalMinY) {
+                globalMinY = element.box.min_corner().get<1>();
+            }
+            if (element.box.max_corner().get<0>() > globalMaxX) {
+                globalMaxX = element.box.max_corner().get<0>();
+            }
+            if (element.box.max_corner().get<1>() > globalMaxY) {
+                globalMaxY = element.box.max_corner().get<1>();
+            }
+        }
+        centerOrdering(*RectanglesD1WithOrder, 1);
+    } else {
+        for (rTreeValue element : sorterRectsD0Basic.sortedView()) {
+            rTreeValueWithOrderIndex entry = rTreeValueWithOrderIndex(element.box, element.id, xSize, 0);
+            sorterRectsD1.push(entry);
+            xSize++;
+
+            if (globalMinX == -1 || element.box.min_corner().get<0>() < globalMinX) {
+                globalMinX = element.box.min_corner().get<0>();
+            }
+            if (globalMinY == -1 || element.box.min_corner().get<1>() < globalMinY) {
+                globalMinY = element.box.min_corner().get<1>();
+            }
+            if (element.box.max_corner().get<0>() > globalMaxX) {
+                globalMaxX = element.box.max_corner().get<0>();
+            }
+            if (element.box.max_corner().get<1>() > globalMaxY) {
+                globalMaxY = element.box.max_corner().get<1>();
+            }
+        }
+    }
+    sorterRectsD0Basic.clear();
+
+    size_t currentS = std::ceil(((float) xSize) / ((float) M));
+
+    long long ySize = 0;
+    std::ofstream r1File = std::ofstream(onDiskBase + ".boundingbox.d1.tmp", std::ios::binary);
+    ad_utility::BackgroundStxxlSorter<rTreeValueWithOrderIndex, sortRuleLambdaXWithIndex> sorterRectsD0 = ad_utility::BackgroundStxxlSorter<rTreeValueWithOrderIndex, sortRuleLambdaXWithIndex>(std::ceil((maxBuildingRamUsage < 9999999999 ? maxBuildingRamUsage : 9999999999) / 3.0));
+    std::shared_ptr<multiBoxWithOrderIndex> RectanglesD0WithOrder = std::make_shared<multiBoxWithOrderIndex>();
+    std::shared_ptr<multiBoxWithOrderIndex> r1Small = std::make_shared<multiBoxWithOrderIndex>();
+    // placeholder
+    r1Small->push_back(rTreeValueWithOrderIndex());
+    r1Small->push_back(rTreeValueWithOrderIndex());
+    rTreeValueWithOrderIndex minD1;
+    rTreeValueWithOrderIndex maxD1;
+
+    if (workInRam) {
+        for (rTreeValueWithOrderIndex element : *RectanglesD1WithOrder) {
+            element.orderY = ySize;
+            RectanglesD0WithOrder->push_back(element);
+
+            if (((ySize + 1) % currentS == 0 && (ySize + 1) / currentS >= 1 && (ySize + 1) / currentS < M)
+                || (ySize % currentS == 0 && ySize / currentS >= 1 && ySize / currentS < M)) {
+                // index i * S - 1 or i * S
+                r1Small->push_back(element);
+            }
+
+            if (ySize == 0) {
+                minD1 = element;
+                maxD1 = element;
+            }
+            if (element.orderY > maxD1.orderY) {
+                maxD1 = element;
+            }
+
+            ySize++;
+        }
+        centerOrdering(*RectanglesD0WithOrder, 0);
+    } else {
+        for (rTreeValueWithOrderIndex element : sorterRectsD1.sortedView()) {
+            element.orderY = ySize;
+            Rtree::SaveEntryWithOrderIndex(element, r1File);
+            sorterRectsD0.push(element);
+
+            if (((ySize + 1) % currentS == 0 && (ySize + 1) / currentS >= 1 && (ySize + 1) / currentS < M)
+                || (ySize % currentS == 0 && ySize / currentS >= 1 && ySize / currentS < M)) {
+                // index i * S - 1 or i * S
+                r1Small->push_back(element);
+            }
+
+            if (ySize == 0) {
+                minD1 = element;
+                maxD1 = element;
+            }
+            if (element.orderY > maxD1.orderY) {
+                maxD1 = element;
+            }
+
+            ySize++;
+        }
+    }
+
+    r1File.close();
+    sorterRectsD1.clear();
+
+    // replace the placeholder
+    (*r1Small)[0] = minD1;
+    (*r1Small)[1] = maxD1;
+
+    long long currentX = 0;
+    std::ofstream r0File = std::ofstream(onDiskBase + ".boundingbox.d0.tmp", std::ios::binary);
+    std::shared_ptr<multiBoxWithOrderIndex> r0Small = std::make_shared<multiBoxWithOrderIndex>();
+    // placeholder
+    r0Small->push_back(rTreeValueWithOrderIndex());
+    r0Small->push_back(rTreeValueWithOrderIndex());
+    rTreeValueWithOrderIndex minD0;
+    rTreeValueWithOrderIndex maxD0;
+
+    if (workInRam) {
+        for (rTreeValueWithOrderIndex element : *RectanglesD0WithOrder) {
+            if (((currentX + 1) % currentS == 0 && (currentX + 1) / currentS >= 1 && (currentX + 1) / currentS < M)
+                || (currentX % currentS == 0 && currentX / currentS >= 1 && currentX / currentS < M)) {
+                // index i * S - 1 or i * S
+                r0Small->push_back(element);
+            }
+
+            if (currentX == 0) {
+                minD0 = element;
+                maxD0 = element;
+            }
+            if (element.orderX > maxD0.orderX) {
+                maxD0 = element;
+            }
+
+            currentX++;
+        }
+    } else {
+        for (rTreeValueWithOrderIndex element : sorterRectsD0.sortedView()) {
+            Rtree::SaveEntryWithOrderIndex(element, r0File);
+
+            if (((currentX + 1) % currentS == 0 && (currentX + 1) / currentS >= 1 && (currentX + 1) / currentS < M)
+                || (currentX % currentS == 0 && currentX / currentS >= 1 && currentX / currentS < M)) {
+                // index i * S - 1 or i * S
+                r0Small->push_back(element);
+            }
+
+            if (currentX == 0) {
+                minD0 = element;
+                maxD0 = element;
+            }
+            if (element.orderX > maxD0.orderX) {
+                maxD0 = element;
+            }
+
+            currentX++;
+        }
+    }
+
+    r0File.close();
+    sorterRectsD0.clear();
+
+    // replace the placeholder
+    (*r0Small)[0] = minD0;
+    (*r0Small)[1] = maxD0;
+
+    boxGeo boundingBox = Rtree::createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
+    if (workInRam) {
+        orderedInputRectangles.CreateOrderedBoxesInRam(RectanglesD0WithOrder, RectanglesD1WithOrder, r0Small, r1Small, boundingBox);
+    } else {
+        orderedInputRectangles.CreateOrderedBoxesOnDisk(onDiskBase + ".boundingbox.d0", onDiskBase + ".boundingbox.d1", r0Small, r1Small, xSize, boundingBox);
+    }
+    return orderedInputRectangles;
+}*/
+
+OrderedBoxes SortInput(const std::string& onDiskBase, size_t M, uintmax_t maxBuildingRamUsage, bool workInRam) {
+  if (workInRam) {
+    return InternalSort(onDiskBase, M);
+  } else {
+    return ExternalSort(onDiskBase, M, maxBuildingRamUsage);
+  }
+}
+
+bool intersects(const boxGeo &b1, const boxGeo &b2) {
+    /**
+       * Determine whether two bounding boxes intersect
+     */
+    bool notIntersecting = b1.min_corner().get<0>() > b2.max_corner().get<0>() ||
+                           b2.min_corner().get<0>() > b1.max_corner().get<0>() ||
+                           b1.min_corner().get<1>() > b2.max_corner().get<1>() ||
+                           b2.min_corner().get<1>() > b1.max_corner().get<1>();
+
+    return !notIntersecting;
+}
+
 static double costFunctionTGS(boxGeo& b0, boxGeo& b1, size_t dim) {
-    /*
-       * To accelerate the algorithm, make sure that both boxes are of similar size.
+    /**
+       * The cost function determines the quality of a split. The lower the cost, the better the split.
+       * Each split gets represented by the resulting bounding boxes of the split pieces.
      */
     double cost;
 
+    // The cost represents the overlap of the two boxes
     if (dim == 0) {
         cost = b0.max_corner().get<0>() - b1.min_corner().get<0>();
         cost = cost < 0 ? 0 : cost;
@@ -87,9 +281,11 @@ boxGeo Rtree::createBoundingBox(double pointOneX, double pointOneY, double point
     return make<boxGeo>(make<pointGeo>(pointOneX, pointOneY), make<pointGeo>(pointTwoX, pointTwoY));
 }
 
-static std::vector<OrderedBoxes> TGSRecursive(const std::string& filePath, OrderedBoxes orderedInputRectangles, size_t M, size_t S, long long maxBuildingRamUsage) {  // https://dl.acm.org/doi/pdf/10.1145/288692.288723
-    /*
-     * inputRectangles needs to be pre-sorted with centerOrdering for both d0 and d1
+static std::vector<OrderedBoxes> TGSRecursive(const std::string& filePath, OrderedBoxes orderedInputRectangles, size_t M, size_t S, long long maxBuildingRamUsage) {
+    /**
+       * This function recursively constructs one layer of children for a certain root node.
+       * The input rectangles must be sorted in both x- and y-direction.
+       * The algorithm is based on this paper https://dl.acm.org/doi/pdf/10.1145/288692.288723
      */
 
     unsigned long long n = orderedInputRectangles.GetSize();
@@ -121,89 +317,10 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
     std::map<long long, long long> lookup;
 
     // sort the rectangles
-    OrderedBoxes orderedInputRectangles;
     long long fileLines = std::ceil(std::filesystem::file_size(file) / (4 * sizeof(double) + sizeof(uint64_t) + 2 * sizeof(long long)));
-    if ((std::filesystem::file_size(file) + fileLines * 2 * sizeof(long long)) * 4 < this->maxBuildingRamUsage) {
-        std::cout << "Building in ram" << std::endl;
-        // do it in ram
-        multiBoxGeo RectanglesD0 = LoadEntries(file);
-        centerOrdering(RectanglesD0, 0);
+    bool workInRam = (std::filesystem::file_size(file) + fileLines * 2 * sizeof(long long)) * 4 < this->maxBuildingRamUsage;
 
-        double globalMinX = -1;
-        double globalMinY = -1;
-        double globalMaxX = -1;
-        double globalMaxY = -1;
-
-        size_t currentS = std::ceil(((float) RectanglesD0.size()) / ((float) M));
-
-        std::shared_ptr<multiBoxWithOrderIndex> R0Small = std::make_shared<multiBoxWithOrderIndex>();
-        std::shared_ptr<multiBoxWithOrderIndex> R1Small = std::make_shared<multiBoxWithOrderIndex>();
-
-        std::shared_ptr<multiBoxWithOrderIndex> RectanglesD1WithOrder = std::make_shared<multiBoxWithOrderIndex>();
-        for (long long i = 0; i < RectanglesD0.size(); i++) {
-            rTreeValue element = RectanglesD0[i];
-            rTreeValueWithOrderIndex entry = std::make_pair(element, std::make_pair(i, 0));
-            RectanglesD1WithOrder->push_back(entry);
-
-            if (globalMinX == -1 || element.first.min_corner().get<0>() < globalMinX) {
-                globalMinX = element.first.min_corner().get<0>();
-            }
-            if (globalMinY == -1 || element.first.min_corner().get<1>() < globalMinY) {
-                globalMinY = element.first.min_corner().get<1>();
-            }
-            if (element.first.max_corner().get<0>() > globalMaxX) {
-                globalMaxX = element.first.max_corner().get<0>();
-            }
-            if (element.first.max_corner().get<1>() > globalMaxY) {
-                globalMaxY = element.first.max_corner().get<1>();
-            }
-        }
-
-        centerOrdering(*RectanglesD1WithOrder, 1);
-
-        R1Small->push_back((*RectanglesD1WithOrder)[0]);
-        rTreeValueWithOrderIndex maxElementDim1 = (*RectanglesD1WithOrder)[RectanglesD1WithOrder->size() - 1];
-        maxElementDim1.second.second = RectanglesD1WithOrder->size() - 1;
-        R1Small->push_back(maxElementDim1);
-        for (long long i = 0; i < RectanglesD1WithOrder->size(); i++) {
-            (*RectanglesD1WithOrder)[i].second.second = i;
-
-            if (((i + 1) % currentS == 0 && (i + 1) / currentS >= 1 && (i + 1) / currentS < M)
-                || (i % currentS == 0 && i / currentS >= 1 && i / currentS < M)) {
-                // index i * S - 1 or i * S
-                R1Small->push_back((*RectanglesD1WithOrder)[i]);
-            }
-        }
-
-        std::shared_ptr<multiBoxWithOrderIndex> RectanglesD0WithOrder = std::make_shared<multiBoxWithOrderIndex>(*RectanglesD1WithOrder);
-        centerOrdering(*RectanglesD0WithOrder, 0);
-
-        R0Small->push_back((*RectanglesD0WithOrder)[0]);
-        rTreeValueWithOrderIndex maxElementDim0 = (*RectanglesD0WithOrder)[RectanglesD0WithOrder->size() - 1];
-        maxElementDim0.second.second = RectanglesD0WithOrder->size() - 1;
-        R0Small->push_back(maxElementDim0);
-        for (long long i = 0; i < RectanglesD0WithOrder->size(); i++) {
-            if (((i + 1) % currentS == 0 && (i + 1) / currentS >= 1 && (i + 1) / currentS < M)
-                || (i % currentS == 0 && i / currentS >= 1 && i / currentS < M)) {
-                // index i * S - 1 or i * S
-                R0Small->push_back((*RectanglesD0WithOrder)[i]);
-            }
-        }
-
-        orderedInputRectangles.CreateOrderedBoxesInRam(RectanglesD0WithOrder, RectanglesD1WithOrder, R0Small, R1Small,
-                                                       createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY));
-        std::cout << "Finished initial sorting" << std::endl;
-    } else {
-        std::cout << "Building on disk" << std::endl;
-
-        std::shared_ptr<multiBoxWithOrderIndex> r0Small = std::make_shared<multiBoxWithOrderIndex>();
-        std::shared_ptr<multiBoxWithOrderIndex> r1Small = std::make_shared<multiBoxWithOrderIndex>();
-        std::pair<boxGeo, long long> externalSortResult = ExternalSort(onDiskBase, r0Small, r1Small, M);
-
-        orderedInputRectangles.CreateOrderedBoxesOnDisk(onDiskBase + ".boundingbox.d0", onDiskBase + ".boundingbox.d1", r0Small, r1Small,
-                                                        externalSortResult.second, externalSortResult.first);
-        std::cout << "Finished initial sorting" << std::endl;
-    }
+    OrderedBoxes orderedInputRectangles = SortInput(onDiskBase, M, maxBuildingRamUsage, workInRam);
 
     // build the tree in a depth first approach
     std::stack<ConstructionNode> layerStack;
@@ -224,9 +341,6 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M, const std::string
             lookup[currentItem.GetId()] = nodePtr;
         } else {
             std::vector<OrderedBoxes> tgsResult = TGSRecursive(onDiskBase + ".boundingbox." + std::to_string(layer), currentItem.GetOrderedBoxes(), M, std::ceil(((float) currentItem.GetOrderedBoxes().GetSize()) / ((float) M)), this->maxBuildingRamUsage);
-            if (tgsResult.size() > M) {
-                std::cout << "Error while building the Rtree: Number of children (" << tgsResult.size() << ") is not equal to M (" << M << ")" << std::endl;
-            }
             for (OrderedBoxes& currentOrderedRectangles : tgsResult) {
                 ConstructionNode newItem = ConstructionNode(newId, currentOrderedRectangles);
                 layerStack.push(newItem);
@@ -265,11 +379,11 @@ multiBoxGeo Rtree::SearchTree(boxGeo query, const std::string &folder) {
         nodes.pop();
 
         for (rTreeValue child : currentNode.GetChildren()) {
-            if (intersects(query, child.first)) {
+            if (intersects(query, child.box)) {
                 if (currentNode.GetIsLastInnerNode()) {
                     results.push_back(child);
                 } else {
-                    Node newNode = LoadNode(child.second, lookupIfs, nodesIfs);
+                    Node newNode = LoadNode(child.id, lookupIfs, nodesIfs);
                     nodes.push(newNode);
                 }
             }
@@ -291,9 +405,13 @@ ConstructionNode::ConstructionNode(long long id, OrderedBoxes orderedBoxes)
 }
 
 void ConstructionNode::AddChildrenToItem() {
+    /**
+       * Add all children of a certain node at once.
+       * This is used when a leaf node is reached.
+     */
     if (this->GetOrderedBoxes().WorkInRam()) {
         for(rTreeValueWithOrderIndex box : *this->GetOrderedBoxes().GetRectanglesInRam()) {
-            Node leafNode = Node(box.first.second, box.first.first);
+            Node leafNode = Node(box.id, box.box);
             this->AddChild(leafNode);
         }
     } else {
@@ -301,7 +419,7 @@ void ConstructionNode::AddChildrenToItem() {
 
         std::optional<rTreeValueWithOrderIndex> element = fileReader.GetNextElement();
         while(element) {
-            Node leafNode = Node(element.value().first.second, element.value().first.first);
+            Node leafNode = Node(element.value().id, element.value().box);
             this->AddChild(leafNode);
             element = fileReader.GetNextElement();
         }
@@ -345,7 +463,7 @@ Node::Node(long long id, double minX, double minY, double maxX, double maxY, boo
 void Node::AddChild(Node& child) {
     boxGeo box = child.GetBoundingBox();
     unsigned long long entryId = child.GetId();
-    rTreeValue entry = std::make_pair(box, entryId);
+    rTreeValue entry = rTreeValue(box, entryId);
     this->children.push_back(entry);
 }
 
@@ -393,6 +511,9 @@ Node Rtree::LoadNode(long long id, std::ifstream& lookupIfs, std::ifstream& node
 }
 
 std::optional<boxGeo> GetBoundingBoxFromWKT(const std::string& wkt) {
+    /**
+       * Parse the wkt literal in a way, that only the relevant data for the rtree gets read in.
+     */
     bool lookingForX = true;
     bool readingDouble = false;
     std::string currentDouble;
@@ -456,6 +577,9 @@ std::optional<boxGeo> GetBoundingBoxFromWKT(const std::string& wkt) {
 }
 
 std::optional<boxGeo> Rtree::ConvertWordToRtreeEntry(const std::string& wkt) {
+    /**
+       * Convert a single wkt literal to a boundingbox.
+     */
     std::optional<boxGeo> boundingBox;
 
     /* Get the bounding box(es) of either a multipolygon, polygon or a linestring */
@@ -486,7 +610,9 @@ std::optional<boxGeo> Rtree::ConvertWordToRtreeEntry(const std::string& wkt) {
 }
 
 void Rtree::SaveEntry(boxGeo boundingBox, uint64_t index, std::ofstream& convertOfs) {
-    /* write the boundingbox value to file */
+    /**
+       * Save a single entry (which was e.g. converted by ConvertWordToRtreeEntry) to the disk
+     */
     double minX = boundingBox.min_corner().get<0>();
     double minY = boundingBox.min_corner().get<1>();
     double maxX = boundingBox.max_corner().get<0>();
@@ -500,48 +626,36 @@ void Rtree::SaveEntry(boxGeo boundingBox, uint64_t index, std::ofstream& convert
 }
 
 void Rtree::SaveEntryWithOrderIndex(rTreeValueWithOrderIndex treeValue, std::ofstream& convertOfs) {
-    /* write the boundingbox value to file */
-    double minX = treeValue.first.first.min_corner().get<0>();
-    double minY = treeValue.first.first.min_corner().get<1>();
-    double maxX = treeValue.first.first.max_corner().get<0>();
-    double maxY = treeValue.first.first.max_corner().get<1>();
+    /**
+       * Save a single entry, containing its postion in the x- and y-sorting
+     */
+    double minX = treeValue.box.min_corner().get<0>();
+    double minY = treeValue.box.min_corner().get<1>();
+    double maxX = treeValue.box.max_corner().get<0>();
+    double maxY = treeValue.box.max_corner().get<1>();
 
     convertOfs.write(reinterpret_cast<const char *>(&minX), sizeof(double));
     convertOfs.write(reinterpret_cast<const char *>(&minY), sizeof(double));
     convertOfs.write(reinterpret_cast<const char *>(&maxX), sizeof(double));
     convertOfs.write(reinterpret_cast<const char *>(&maxY), sizeof(double));
-    convertOfs.write(reinterpret_cast<const char *>(&treeValue.first.second), sizeof(uint64_t));
-    convertOfs.write(reinterpret_cast<const char *>(&treeValue.second.first), sizeof(long long));
-    convertOfs.write(reinterpret_cast<const char *>(&treeValue.second.second), sizeof(long long));
+    convertOfs.write(reinterpret_cast<const char *>(&treeValue.id), sizeof(uint64_t));
+    convertOfs.write(reinterpret_cast<const char *>(&treeValue.orderX), sizeof(long long));
+    convertOfs.write(reinterpret_cast<const char *>(&treeValue.orderY), sizeof(long long));
 }
 
 multiBoxGeo Rtree::LoadEntries(const std::string& file) {
     multiBoxGeo boxes;
 
-    std::ifstream loadEntriesIfs = std::ifstream(file, std::ios::binary);
-    loadEntriesIfs.seekg (0, std::ifstream::end);
-    long long fileLength = loadEntriesIfs.tellg();
-    loadEntriesIfs.seekg (0, std::ifstream::beg);
+    FileReaderWithoutIndex fileReader = FileReaderWithoutIndex(file);
 
-    double minX;
-    double minY;
-    double maxX;
-    double maxY;
-    uint64_t id;
-
-    while (loadEntriesIfs.tellg() < fileLength) {
-        loadEntriesIfs.read(reinterpret_cast<char*>(&minX), sizeof(double));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&minY), sizeof(double));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&maxX), sizeof(double));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&maxY), sizeof(double));
-        loadEntriesIfs.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
-
-        boxGeo box = createBoundingBox(minX, minY, maxX, maxY);
-        rTreeValue boxWithId = std::make_pair(box, id);
-        boxes.push_back(boxWithId);
+    std::optional<rTreeValue> element = fileReader.GetNextElement();
+    while (element) {
+        boxes.push_back(element.value());
+        element = fileReader.GetNextElement();
     }
 
-    loadEntriesIfs.close();
+    fileReader.Close();
+
     return boxes;
 }
 
@@ -605,6 +719,9 @@ std::string OrderedBoxes::GetRectanglesOnDisk() {
 }
 
 SplitResult OrderedBoxes::GetBestSplit() {
+    /**
+       * Determine based on the "small-lists", which split is the best for the rtree.
+     */
     struct SplitResult splitResult;
 
     rTreeValueWithOrderIndex minElement;
@@ -612,6 +729,8 @@ SplitResult OrderedBoxes::GetBestSplit() {
     rTreeValueWithOrderIndex currentLastElement;
     rTreeValueWithOrderIndex currentElement;
 
+    // This bool is used, since we need every other element as our element "S * i" (described in the algorithm)
+    // To perform the split better, the element before it (S * i - 1) is saved as well
     bool currentlyAtSTimesI = false;
 
     for (size_t dim = 0; dim < 2; dim++) {
@@ -645,20 +764,20 @@ SplitResult OrderedBoxes::GetBestSplit() {
             double minYB1 = 0;
             double maxYB1 = 1;
 
-            if (currentlyAtSTimesI && currentElement.first.second != maxElement.first.second) {
-
+            if (currentlyAtSTimesI && currentElement.id != maxElement.id) {
+                // the current element is a possible split position.
                 if (dim == 0) {
-                    minXB0 = (minElement.first.first.min_corner().get<0>() + minElement.first.first.max_corner().get<0>()) / 2;
-                    maxXB0 = (currentLastElement.first.first.min_corner().get<0>() + currentLastElement.first.first.max_corner().get<0>()) / 2;
+                    minXB0 = (minElement.box.min_corner().get<0>() + minElement.box.max_corner().get<0>()) / 2;
+                    maxXB0 = (currentLastElement.box.min_corner().get<0>() + currentLastElement.box.max_corner().get<0>()) / 2;
 
-                    minXB1 = (currentElement.first.first.min_corner().get<0>() + currentElement.first.first.max_corner().get<0>()) / 2;
-                    maxXB1 = (maxElement.first.first.min_corner().get<0>() + maxElement.first.first.max_corner().get<0>()) / 2;
+                    minXB1 = (currentElement.box.min_corner().get<0>() + currentElement.box.max_corner().get<0>()) / 2;
+                    maxXB1 = (maxElement.box.min_corner().get<0>() + maxElement.box.max_corner().get<0>()) / 2;
                 } else {
-                    minYB0 = (minElement.first.first.min_corner().get<1>() + minElement.first.first.max_corner().get<1>()) / 2;
-                    maxYB0 = (currentLastElement.first.first.min_corner().get<1>() + currentLastElement.first.first.max_corner().get<1>()) / 2;
+                    minYB0 = (minElement.box.min_corner().get<1>() + minElement.box.max_corner().get<1>()) / 2;
+                    maxYB0 = (currentLastElement.box.min_corner().get<1>() + currentLastElement.box.max_corner().get<1>()) / 2;
 
-                    minYB1 = (currentElement.first.first.min_corner().get<1>() + currentElement.first.first.max_corner().get<1>()) / 2;
-                    maxYB1 = (maxElement.first.first.min_corner().get<1>() + maxElement.first.first.max_corner().get<1>()) / 2;
+                    minYB1 = (currentElement.box.min_corner().get<1>() + currentElement.box.max_corner().get<1>()) / 2;
+                    maxYB1 = (maxElement.box.min_corner().get<1>() + maxElement.box.max_corner().get<1>()) / 2;
                 }
 
                 currentlyAtSTimesI = false;
@@ -697,6 +816,10 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBest(const std::strin
 }
 
 std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestInRam(size_t S, size_t M) {
+    /**
+       * Split the ordered boxes in ram. First determine the best split and then perform it
+     */
+
     struct SplitResult splitResult = this->GetBestSplit();
 
     OrderedBoxes split0;
@@ -732,6 +855,10 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestInRam(size_t S, s
 }
 
 std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestOnDisk(const std::string& filePath, size_t S, size_t M, long long maxBuildingRamUsage) {
+    /**
+       * Split the ordered boxes on disk. First determine the best split and then perform it
+     */
+
     OrderedBoxes split0;
     OrderedBoxes split1;
 
@@ -798,6 +925,10 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestOnDisk(const std:
 }
 
 std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, SplitBuffersRam& splitBuffersRam, size_t M, size_t S) {
+    /**
+       * Perform the best split on the current ordered boxes in the ram case
+     */
+
     struct SplitBuffersDisk splitBuffersDisk;
 
     splitBuffersDisk.splitBuffersRam = splitBuffersRam;
@@ -806,6 +937,7 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
     splitBuffersDisk.split1Dim0File = {};
     splitBuffersDisk.split1Dim1File = {};
 
+    // reuse the PerfromSplit of the Disk case.
     std::pair<boxGeo, boxGeo> boundingBoxes = PerformSplit(splitResult, splitBuffersDisk, M, S, 0);
 
     splitBuffersRam = splitBuffersDisk.splitBuffersRam;
@@ -814,6 +946,10 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
 }
 
 std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, SplitBuffersDisk& splitBuffers, size_t M, size_t S, long long maxBuildingRamUsage) {
+    /**
+       * Perform the best split on the current ordered boxes in the disk case
+     */
+
     long long sizeLeft = std::ceil((splitResult.bestIndex - 2) / 2.0) * S;
     long long sizeRight = this->size - sizeLeft;
     size_t SSplit0 = sizeLeft <= S ? std::ceil(sizeLeft / (double) M) : S;
@@ -844,7 +980,7 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
         splitBuffers.splitBuffersRam.s1SmallDim0->push_back(splitResult.bestElement);
         splitBuffers.splitBuffersRam.s1SmallDim0->push_back(splitResult.bestMaxElement);
 
-        // placeholder
+        // placeholder, since we need the min and max element of the split in the first two spots
         splitBuffers.splitBuffersRam.s0SmallDim1->push_back(rTreeValueWithOrderIndex());
         splitBuffers.splitBuffersRam.s0SmallDim1->push_back(rTreeValueWithOrderIndex());
         splitBuffers.splitBuffersRam.s1SmallDim1->push_back(rTreeValueWithOrderIndex());
@@ -874,6 +1010,7 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
     long long currentYSplit0 = 0;
     long long currentYSplit1 = 0;
     for (size_t dim = 0; dim < 2; dim++) {
+        // start performing the actual split
         long long i = 0;
 
         if (!this->workInRam) {
@@ -885,47 +1022,55 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
 
         while ((this->workInRam && i < this->size) || (!this->workInRam && elementOpt)) {
             rTreeValueWithOrderIndex element;
+
+            // get the current element, either from disk or from ram
             if (this->workInRam) {
                 element = dim == 0 ? (*this->rectanglesD0InRam)[i] : (*this->rectanglesD1InRam)[i];
             } else {
                 element = elementOpt.value();
             }
 
-            if ((splitResult.bestDim == 0 && element.second.first < splitResult.bestElement.second.first)
-                || (splitResult.bestDim == 1 && element.second.second < splitResult.bestElement.second.second)) {
-                // split 0
+            if ((splitResult.bestDim == 0 && element.orderX < splitResult.bestElement.orderX)
+                || (splitResult.bestDim == 1 && element.orderY < splitResult.bestElement.orderY)) {
+                // the element belongs to split 0
 
                 if (dim == 0) {
+                    // add the element to the split 0 dimension 0 vector / file
                     if (split0InRam || this->workInRam) {
                         splitBuffers.splitBuffersRam.s0Dim0->push_back(element);
                     } else {
                         Rtree::SaveEntryWithOrderIndex(element, splitBuffers.split0Dim0File.value());
                     }
+
+                    // check if the element is at the position i * S (described in the algorithm) or one before it.
+                    // In this case it is a future possible split position and needs to be saved to the "small list"
                     if (((currentXSplit0 + 1) % SSplit0 == 0 && (currentXSplit0 + 1) / SSplit0 >= 1 && (currentXSplit0 + 1) / SSplit0 < M)
                         || (currentXSplit0 % SSplit0 == 0 && currentXSplit0 / SSplit0 >= 1 && currentXSplit0 / SSplit0 < M)) {
                         // index i * S - 1 or i * S
                         splitBuffers.splitBuffersRam.s0SmallDim0->push_back(element);
                     }
 
-                    if (globalMinXS0 == -1 || element.first.first.min_corner().get<0>() < globalMinXS0) {
-                        globalMinXS0 = element.first.first.min_corner().get<0>();
+                    // keep track of the min and max values to construct the bounding box of the split later
+                    if (globalMinXS0 == -1 || element.box.min_corner().get<0>() < globalMinXS0) {
+                        globalMinXS0 = element.box.min_corner().get<0>();
                     }
-                    if (globalMinYS0 == -1 || element.first.first.min_corner().get<1>() < globalMinYS0) {
-                        globalMinYS0 = element.first.first.min_corner().get<1>();
+                    if (globalMinYS0 == -1 || element.box.min_corner().get<1>() < globalMinYS0) {
+                        globalMinYS0 = element.box.min_corner().get<1>();
                     }
-                    if (element.first.first.max_corner().get<0>() > globalMaxXS0) {
-                        globalMaxXS0 = element.first.first.max_corner().get<0>();
+                    if (element.box.max_corner().get<0>() > globalMaxXS0) {
+                        globalMaxXS0 = element.box.max_corner().get<0>();
                     }
-                    if (element.first.first.max_corner().get<1>() > globalMaxYS0) {
-                        globalMaxYS0 = element.first.first.max_corner().get<1>();
+                    if (element.box.max_corner().get<1>() > globalMaxYS0) {
+                        globalMaxYS0 = element.box.max_corner().get<1>();
                     }
 
+                    // keep track of the min and max element of the split, to later replace the placeholder in the "small lists"
                     if (splitResult.bestDim == 1) {
                         if (currentXSplit0 == 0) {
                             minSplit0OtherDim = element;
                             maxSplit0OtherDim = element;
                         }
-                        if (element.second.first > maxSplit0OtherDim.second.first) {
+                        if (element.orderX > maxSplit0OtherDim.orderX) {
                             maxSplit0OtherDim = element;
                         }
                     }
@@ -949,7 +1094,7 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
                             minSplit0OtherDim = element;
                             maxSplit0OtherDim = element;
                         }
-                        if (element.second.first > maxSplit0OtherDim.second.first) {
+                        if (element.orderX > maxSplit0OtherDim.orderX) {
                             maxSplit0OtherDim = element;
                         }
                     }
@@ -957,7 +1102,7 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
                     currentYSplit0++;
                 }
             } else {
-                // split 1
+                // the element belongs to split 1
 
                 if (dim == 0) {
                     if (split1InRam || this->workInRam) {
@@ -971,17 +1116,17 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
                         splitBuffers.splitBuffersRam.s1SmallDim0->push_back(element);
                     }
 
-                    if (globalMinXS1 == -1 || element.first.first.min_corner().get<0>() < globalMinXS1) {
-                        globalMinXS1 = element.first.first.min_corner().get<0>();
+                    if (globalMinXS1 == -1 || element.box.min_corner().get<0>() < globalMinXS1) {
+                        globalMinXS1 = element.box.min_corner().get<0>();
                     }
-                    if (globalMinYS1 == -1 || element.first.first.min_corner().get<1>() < globalMinYS1) {
-                        globalMinYS1 = element.first.first.min_corner().get<1>();
+                    if (globalMinYS1 == -1 || element.box.min_corner().get<1>() < globalMinYS1) {
+                        globalMinYS1 = element.box.min_corner().get<1>();
                     }
-                    if (element.first.first.max_corner().get<0>() > globalMaxXS1) {
-                        globalMaxXS1 = element.first.first.max_corner().get<0>();
+                    if (element.box.max_corner().get<0>() > globalMaxXS1) {
+                        globalMaxXS1 = element.box.max_corner().get<0>();
                     }
-                    if (element.first.first.max_corner().get<1>() > globalMaxYS1) {
-                        globalMaxYS1 = element.first.first.max_corner().get<1>();
+                    if (element.box.max_corner().get<1>() > globalMaxYS1) {
+                        globalMaxYS1 = element.box.max_corner().get<1>();
                     }
 
                     if (splitResult.bestDim == 1) {
@@ -989,7 +1134,7 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
                             minSplit1OtherDim = element;
                             maxSplit1OtherDim = element;
                         }
-                        if (element.second.first > maxSplit1OtherDim.second.first) {
+                        if (element.orderX > maxSplit1OtherDim.orderX) {
                             maxSplit1OtherDim = element;
                         }
                     }
@@ -1012,7 +1157,7 @@ std::pair<boxGeo, boxGeo> OrderedBoxes::PerformSplit(SplitResult splitResult, Sp
                             minSplit1OtherDim = element;
                             maxSplit1OtherDim = element;
                         }
-                        if (element.second.first > maxSplit1OtherDim.second.first) {
+                        if (element.orderX > maxSplit1OtherDim.orderX) {
                             maxSplit1OtherDim = element;
                         }
                     }
@@ -1083,8 +1228,7 @@ std::optional<rTreeValueWithOrderIndex> FileReader::GetNextElement() {
         this->file.read(reinterpret_cast<char*>(&orderY), sizeof(long long));
 
         boxGeo box = Rtree::createBoundingBox(minX, minY, maxX, maxY);
-        rTreeValue boxWithId = std::make_pair(box, id);
-        rTreeValueWithOrderIndex element = std::make_pair(boxWithId, std::make_pair(orderX, orderY));
+        rTreeValueWithOrderIndex element = rTreeValueWithOrderIndex(box, id, orderX, orderY);
 
         return { element };
     } else {
@@ -1093,5 +1237,41 @@ std::optional<rTreeValueWithOrderIndex> FileReader::GetNextElement() {
 }
 
 void FileReader::Close() {
+    this->file.close();
+}
+
+FileReaderWithoutIndex::FileReaderWithoutIndex(const std::string& filePath) {
+    this->filePath = filePath;
+
+    this->file = std::ifstream(this->filePath, std::ios::binary);
+    this->file.seekg (0, std::ifstream::end);
+    this->fileLength = this->file.tellg();
+    this->file.seekg (0, std::ifstream::beg);
+}
+
+std::optional<rTreeValue> FileReaderWithoutIndex::GetNextElement() {
+    if (this->file.tellg() < this->fileLength) {
+        double minX;
+        double minY;
+        double maxX;
+        double maxY;
+        uint64_t id;
+
+        this->file.read(reinterpret_cast<char*>(&minX), sizeof(double));
+        this->file.read(reinterpret_cast<char*>(&minY), sizeof(double));
+        this->file.read(reinterpret_cast<char*>(&maxX), sizeof(double));
+        this->file.read(reinterpret_cast<char*>(&maxY), sizeof(double));
+        this->file.read(reinterpret_cast<char*>(&id), sizeof(uint64_t));
+
+        boxGeo box = Rtree::createBoundingBox(minX, minY, maxX, maxY);
+        rTreeValue boxWithId = rTreeValue(box, id);
+
+        return { boxWithId };
+    } else {
+        return {};
+    }
+}
+
+void FileReaderWithoutIndex::Close() {
     this->file.close();
 }
