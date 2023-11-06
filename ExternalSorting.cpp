@@ -7,12 +7,12 @@
 static void centerOrderingExt(multiBoxGeo& boxes, size_t dim) {
     if (dim == 0) {
         // order by centerX
-        sortRuleLambdaX comp;
+        SortRuleLambda<0> comp;
 
         std::sort(boxes.begin(), boxes.end(), comp);
     } else {
         // order by centerY
-        auto sortRuleLambda = [](rTreeValue b1, rTreeValue b2) -> bool {
+        auto sortRuleLambda = [](RTreeValue b1, RTreeValue b2) -> bool {
             double center1 = (b1.box.min_corner().get<1>() + b1.box.max_corner().get<1>()) / 2;
             double center2 = (b2.box.min_corner().get<1>() + b2.box.max_corner().get<1>()) / 2;
             return center1 < center2;
@@ -25,12 +25,12 @@ static void centerOrderingExt(multiBoxGeo& boxes, size_t dim) {
 static void centerOrderingExt(multiBoxWithOrderIndex& boxes, size_t dim) {
     if (dim == 0) {
         // order by centerX
-        sortRuleLambdaXWithIndex comp;
+        SortRuleLambdaWithIndex<0> comp;
 
         std::sort(boxes.begin(), boxes.end(), comp);
     } else {
         // order by centerY
-        sortRuleLambdaYWithIndex comp;
+        SortRuleLambdaWithIndex<1> comp;
 
         std::sort(boxes.begin(), boxes.end(), comp);
     }
@@ -42,15 +42,15 @@ OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t max
 
     centerOrderingExt(RectanglesD0, 0);
 
-    long long xSize = 0;
+    uint64_t xSize = 0;
     double globalMinX = -1;
     double globalMinY = -1;
     double globalMaxX = -1;
     double globalMaxY = -1;
 
     std::ofstream r0File = std::ofstream(onDiskBase + ".boundingbox.d0.tmp", std::ios::binary);
-    for (rTreeValue element : RectanglesD0) {
-        rTreeValueWithOrderIndex entry = rTreeValueWithOrderIndex(element.box, element.id, xSize, 0);
+    for (RTreeValue element : RectanglesD0) {
+        RTreeValueWithOrderIndex entry = {{element.box, element.id}, xSize, 0};
         Rtree::SaveEntryWithOrderIndex(entry, r0File);
         xSize++;
 
@@ -75,21 +75,21 @@ OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t max
 
     size_t currentS = std::ceil(((float) xSize) / ((float) M));
 
-    long long ySize = 0;
+    uint64_t ySize = 0;
     std::ofstream r1File = std::ofstream(onDiskBase + ".boundingbox.d1.tmp", std::ios::binary);
-    std::shared_ptr<multiBoxWithOrderIndex> r1Small = std::make_shared<multiBoxWithOrderIndex>();
-    r1Small->push_back(RectanglesD1[0]);
-    rTreeValueWithOrderIndex maxElementDim1 = RectanglesD1[RectanglesD1.size() - 1];
+    multiBoxWithOrderIndex r1Small = multiBoxWithOrderIndex();
+    r1Small.push_back(RectanglesD1[0]);
+    RTreeValueWithOrderIndex maxElementDim1 = RectanglesD1[RectanglesD1.size() - 1];
     maxElementDim1.orderY = RectanglesD1.size() - 1;
-    r1Small->push_back(maxElementDim1);
-    for (rTreeValueWithOrderIndex element : RectanglesD1) {
+    r1Small.push_back(maxElementDim1);
+    for (RTreeValueWithOrderIndex element : RectanglesD1) {
         element.orderY = ySize;
         Rtree::SaveEntryWithOrderIndex(element, r1File);
 
         if (((ySize + 1) % currentS == 0 && (ySize + 1) / currentS >= 1 && (ySize + 1) / currentS < M)
             || (ySize % currentS == 0 && ySize / currentS >= 1 && ySize / currentS < M)) {
             // index i * S - 1 or i * S
-            r1Small->push_back(element);
+            r1Small.push_back(element);
         }
 
         ySize++;
@@ -100,18 +100,18 @@ OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t max
     multiBoxWithOrderIndex RectanglesD0Second = Rtree::LoadEntriesWithOrderIndex(onDiskBase + ".boundingbox.d1.tmp");
     centerOrderingExt(RectanglesD0Second, 0);
 
-    long long currentX = 0;
+    uint64_t currentX = 0;
     std::ofstream r0FileSecond = std::ofstream(onDiskBase + ".boundingbox.d0.tmp", std::ios::binary);
-    std::shared_ptr<multiBoxWithOrderIndex> r0Small = std::make_shared<multiBoxWithOrderIndex>();
-    r0Small->push_back(RectanglesD0Second[0]);
-    r0Small->push_back(RectanglesD0Second[RectanglesD0Second.size() - 1]);
-    for (rTreeValueWithOrderIndex element : RectanglesD0Second) {
+    multiBoxWithOrderIndex r0Small = multiBoxWithOrderIndex();
+    r0Small.push_back(RectanglesD0Second[0]);
+    r0Small.push_back(RectanglesD0Second[RectanglesD0Second.size() - 1]);
+    for (RTreeValueWithOrderIndex element : RectanglesD0Second) {
         Rtree::SaveEntryWithOrderIndex(element, r0FileSecond);
 
         if (((currentX + 1) % currentS == 0 && (currentX + 1) / currentS >= 1 && (currentX + 1) / currentS < M)
             || (currentX % currentS == 0 && currentX / currentS >= 1 && currentX / currentS < M)) {
             // index i * S - 1 or i * S
-            r0Small->push_back(element);
+            r0Small.push_back(element);
         }
 
         currentX++;
@@ -119,8 +119,14 @@ OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t max
     r0FileSecond.close();
     RectanglesD0Second.clear();
 
-    boxGeo boundingBox = Rtree::createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
-    orderedInputRectangles.CreateOrderedBoxesOnDisk(onDiskBase + ".boundingbox.d0", onDiskBase + ".boundingbox.d1", r0Small, r1Small, xSize, boundingBox);
+    Rtree::BoundingBox boundingBox = Rtree::createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
+    RectanglesForOrderedBoxes d0WithOrder;
+    d0WithOrder.rectanglesOnDisk = onDiskBase + ".boundingbox.d0.tmp";
+    d0WithOrder.rectanglesSmall = r0Small;
+    RectanglesForOrderedBoxes d1WithOrder;
+    d1WithOrder.rectanglesOnDisk = onDiskBase + ".boundingbox.d1.tmp";
+    d1WithOrder.rectanglesSmall = r1Small;
+    orderedInputRectangles.SetOrderedBoxesToDisk(d0WithOrder, d1WithOrder, xSize, boundingBox);
     return orderedInputRectangles;
 }
 
@@ -136,14 +142,14 @@ OrderedBoxes InternalSort(const std::string& onDiskBase, size_t M) {
 
     size_t currentS = std::ceil(((float) RectanglesD0.size()) / ((float) M));
 
-    std::shared_ptr<multiBoxWithOrderIndex> R0Small = std::make_shared<multiBoxWithOrderIndex>();
-    std::shared_ptr<multiBoxWithOrderIndex> R1Small = std::make_shared<multiBoxWithOrderIndex>();
+    multiBoxWithOrderIndex R0Small = multiBoxWithOrderIndex();
+    multiBoxWithOrderIndex R1Small = multiBoxWithOrderIndex();
 
-    std::shared_ptr<multiBoxWithOrderIndex> RectanglesD1WithOrder = std::make_shared<multiBoxWithOrderIndex>();
-    for (long long i = 0; i < RectanglesD0.size(); i++) {
-        rTreeValue element = RectanglesD0[i];
-        rTreeValueWithOrderIndex entry = rTreeValueWithOrderIndex(element.box, element.id, i, 0);
-        RectanglesD1WithOrder->push_back(entry);
+    multiBoxWithOrderIndex RectanglesD1WithOrder = multiBoxWithOrderIndex();
+    for (uint64_t i = 0; i < RectanglesD0.size(); i++) {
+        RTreeValue element = RectanglesD0[i];
+        RTreeValueWithOrderIndex entry = {{element.box, element.id}, i, 0};
+        RectanglesD1WithOrder.push_back(entry);
 
         if (globalMinX == -1 || element.box.min_corner().get<0>() < globalMinX) {
             globalMinX = element.box.min_corner().get<0>();
@@ -159,38 +165,44 @@ OrderedBoxes InternalSort(const std::string& onDiskBase, size_t M) {
         }
     }
 
-    centerOrderingExt(*RectanglesD1WithOrder, 1);
+    centerOrderingExt(RectanglesD1WithOrder, 1);
 
-    R1Small->push_back((*RectanglesD1WithOrder)[0]);
-    rTreeValueWithOrderIndex maxElementDim1 = (*RectanglesD1WithOrder)[RectanglesD1WithOrder->size() - 1];
-    maxElementDim1.orderY = RectanglesD1WithOrder->size() - 1;
-    R1Small->push_back(maxElementDim1);
-    for (long long i = 0; i < RectanglesD1WithOrder->size(); i++) {
-        (*RectanglesD1WithOrder)[i].orderY = i;
+    R1Small.push_back((RectanglesD1WithOrder)[0]);
+    RTreeValueWithOrderIndex maxElementDim1 = (RectanglesD1WithOrder)[RectanglesD1WithOrder.size() - 1];
+    maxElementDim1.orderY = RectanglesD1WithOrder.size() - 1;
+    R1Small.push_back(maxElementDim1);
+    for (uint64_t i = 0; i < RectanglesD1WithOrder.size(); i++) {
+        (RectanglesD1WithOrder)[i].orderY = i;
 
         if (((i + 1) % currentS == 0 && (i + 1) / currentS >= 1 && (i + 1) / currentS < M)
             || (i % currentS == 0 && i / currentS >= 1 && i / currentS < M)) {
             // index i * S - 1 or i * S
-            R1Small->push_back((*RectanglesD1WithOrder)[i]);
+            R1Small.push_back((RectanglesD1WithOrder)[i]);
         }
     }
 
-    std::shared_ptr<multiBoxWithOrderIndex> RectanglesD0WithOrder = std::make_shared<multiBoxWithOrderIndex>(*RectanglesD1WithOrder);
-    centerOrderingExt(*RectanglesD0WithOrder, 0);
+    multiBoxWithOrderIndex RectanglesD0WithOrder = multiBoxWithOrderIndex(RectanglesD1WithOrder);
+    centerOrderingExt(RectanglesD0WithOrder, 0);
 
-    R0Small->push_back((*RectanglesD0WithOrder)[0]);
-    rTreeValueWithOrderIndex maxElementDim0 = (*RectanglesD0WithOrder)[RectanglesD0WithOrder->size() - 1];
-    maxElementDim0.orderY = RectanglesD0WithOrder->size() - 1;
-    R0Small->push_back(maxElementDim0);
-    for (long long i = 0; i < RectanglesD0WithOrder->size(); i++) {
+    R0Small.push_back((RectanglesD0WithOrder)[0]);
+    RTreeValueWithOrderIndex maxElementDim0 = (RectanglesD0WithOrder)[RectanglesD0WithOrder.size() - 1];
+    maxElementDim0.orderY = RectanglesD0WithOrder.size() - 1;
+    R0Small.push_back(maxElementDim0);
+    for (uint64_t i = 0; i < RectanglesD0WithOrder.size(); i++) {
         if (((i + 1) % currentS == 0 && (i + 1) / currentS >= 1 && (i + 1) / currentS < M)
             || (i % currentS == 0 && i / currentS >= 1 && i / currentS < M)) {
             // index i * S - 1 or i * S
-            R0Small->push_back((*RectanglesD0WithOrder)[i]);
+            R0Small.push_back((RectanglesD0WithOrder)[i]);
         }
     }
 
-    boxGeo boundingBox = Rtree::createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
-    orderedInputRectangles.CreateOrderedBoxesInRam(RectanglesD0WithOrder, RectanglesD1WithOrder, R0Small, R1Small, boundingBox);
+    Rtree::BoundingBox boundingBox = Rtree::createBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
+    RectanglesForOrderedBoxes d0WithOrder;
+    d0WithOrder.rectanglesInRam = RectanglesD0WithOrder;
+    d0WithOrder.rectanglesSmall = R0Small;
+    RectanglesForOrderedBoxes d1WithOrder;
+    d1WithOrder.rectanglesInRam = RectanglesD1WithOrder;
+    d1WithOrder.rectanglesSmall = R1Small;
+    orderedInputRectangles.SetOrderedBoxesToRam(d0WithOrder, d1WithOrder, boundingBox);
     return orderedInputRectangles;
 }

@@ -6,8 +6,10 @@
 #include <boost/geometry/index/rtree.hpp>
 #include <iostream>
 #include <fstream>
+#include <utility>
 #include <vector>
 #include "Rtree/Rtree.h"
+#include "Rtree/RtreeFileReader.h"
 #include <filesystem>
 #include <regex>
 
@@ -462,6 +464,25 @@ public:
 }*/
 
 void showCase() {
+    /*std::vector<int> xTotalList = std::vector<int>();
+    std::vector<int> yTotalList = std::vector<int>();
+    for (const RTreeValueWithOrderIndex& element :
+            FileReader("../switzerland_raw/converted_data_100k.boundingbox.d0.tmp")) {
+       xTotalList.push_back(element.id);
+    }
+    for (const RTreeValueWithOrderIndex& element :
+            FileReader("../switzerland_raw/converted_data_100k.boundingbox.d0.tmp")) {
+        yTotalList.push_back(element.id);
+    }
+    std::vector<int> diffTotal0;
+    std::vector<int> diffTotal1;
+    std::sort(xTotalList.begin(), xTotalList.end());
+    std::sort(yTotalList.begin(), yTotalList.end());
+
+    std::set_difference(xTotalList.begin(), xTotalList.end(), yTotalList.begin(), yTotalList.end(),
+                        std::inserter(diffTotal0, diffTotal0.begin()));
+    std::set_difference(yTotalList.begin(), yTotalList.end(), xTotalList.begin(), xTotalList.end(),
+                        std::inserter(diffTotal1, diffTotal1.begin()));*/
     //GeoLocation test;
     //multiPolygonGeo m;
     //bg::read_wkt("MULTIPOLYGON(((6.0859436 50.7580645,6.0859881 50.7582046,6.0860374 50.7581984,6.0860460 50.7582255,6.0862678 50.7581973,6.0862594 50.7581708,6.0866540 50.7581207,6.0867201 50.7581123,6.0867354 50.7581603,6.0868121 50.7584019,6.0872680 50.7583439,6.0871550 50.7579880,6.0870223 50.7580049,6.0869902 50.7580090,6.0869831 50.7579865,6.0867916 50.7573839,6.0866235 50.7574053,6.0866417 50.7574623,6.0867314 50.7577444,6.0867755 50.7578832,6.0866545 50.7578986,6.0867048 50.7580568,6.0866710 50.7580611,6.0865367 50.7580782,6.0865118 50.7580000,6.0864775 50.7578917,6.0864619 50.7578427,6.0862767 50.7578662,6.0861611 50.7578809,6.0859437 50.7579086,6.0859913 50.7580585,6.0859436 50.7580645),(6.0868632 50.7581593,6.0870314 50.7581379,6.0870580 50.7582210,6.0868892 50.7582423,6.0868632 50.7581593)))", m);
@@ -562,15 +583,15 @@ void showCase() {
 
     //std::cout << tree.time << std::endl;
 
-    Rtree rtree = Rtree(4000000);
+    Rtree rtree = Rtree(40000000000);
     rtree.BuildTree("../switzerland_raw/converted_data_100k", 16, "../switzerland_raw/rtree_build");
     //multiBoxGeo results = rtree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland_raw/rtree_build");
-    multiBoxGeo results = rtree.SearchTree(Rtree::createBoundingBox(9.88657, 47.38431, 9.88671, 47.6088), "../switzerland_raw/rtree_build_test");
-    for(rTreeValue result : results) {
+    /*multiBoxGeo results = rtree.SearchTree(Rtree::createBoundingBox(9.88657, 47.38431, 9.88671, 47.6088), "../switzerland_raw/rtree_build");
+    for(RTreeValue result : results) {
         std::cout << result.box.min_corner().get<0>() << " " << result.box.min_corner().get<1>() << "," << result.box.max_corner().get<0>()
                   << " " << result.box.max_corner().get<1>() << "," << result.id << std::endl;
     }
-    std::cout << "Found " << results.size() << " results" << std::endl;
+    std::cout << "Found " << results.size() << " results" << std::endl;*/
 
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
