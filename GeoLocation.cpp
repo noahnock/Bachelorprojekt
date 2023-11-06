@@ -6,15 +6,17 @@
 #include <boost/geometry/index/rtree.hpp>
 #include <iostream>
 #include <fstream>
+#include <utility>
 #include <vector>
 #include "Rtree/Rtree.h"
+#include "Rtree/RtreeFileReader.h"
 #include <filesystem>
 #include <regex>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
 
-using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::degree>>;
+/*using pointGeo = bg::model::point<double, 2, bg::cs::spherical_equatorial<bg::degree>>;
 using polygonGeo = bg::model::polygon<pointGeo>;
 using multiPolygonGeo = bg::model::multi_polygon<polygonGeo>;
 using boxGeo = bg::model::box<pointGeo>;
@@ -217,7 +219,7 @@ public:
     static double costFunctionTGS(boxGeo& b0, boxGeo& b1) {
         /*
          * To accelerate the algorithm, make sure that both boxes are of similar size.
-         */
+         *//*
 
         double areaB0 = (b0.max_corner().get<0>() - b0.min_corner().get<0>()) * (b0.max_corner().get<1>() - b0.min_corner().get<1>());
         double areaB1 = (b1.max_corner().get<0>() - b1.min_corner().get<0>()) * (b1.max_corner().get<1>() - b1.min_corner().get<1>());
@@ -233,7 +235,7 @@ public:
     static std::vector<multiBoxGeo> TGSRecursive(const std::vector<multiBoxGeo>& orderedInputRectangles, size_t S, size_t M) {  // https://dl.acm.org/doi/pdf/10.1145/288692.288723
         /*
          * inputRectangles needs to be pre-sorted with centerOrdering for both d0 and d1
-         */
+         *//*
 
         size_t n = orderedInputRectangles[0].size();
 
@@ -424,7 +426,7 @@ public:
             for (rTreeValue result : results) {
                 std::cout << result.first.min_corner().get<0>() << " " << result.first.min_corner().get<1>() << "," << result.first.max_corner().get<0>()
                         << " " << result.first.max_corner().get<1>() << "," << result.second << std::endl;
-            }*/
+            }*//*
         }
 
     }
@@ -441,8 +443,8 @@ public:
         }
 
         tree.CloseConversion();
-    }*/
-};
+    }
+};*/
 
 /*void CheckForDuplicateIds(multiBoxGeo& boxes) {
     std::vector<unsigned int> cache;
@@ -462,7 +464,26 @@ public:
 }*/
 
 void showCase() {
-    GeoLocation test;
+    /*std::vector<int> xTotalList = std::vector<int>();
+    std::vector<int> yTotalList = std::vector<int>();
+    for (const RTreeValueWithOrderIndex& element :
+            FileReader("../switzerland_raw/converted_data_100k.boundingbox.d0.tmp")) {
+       xTotalList.push_back(element.id);
+    }
+    for (const RTreeValueWithOrderIndex& element :
+            FileReader("../switzerland_raw/converted_data_100k.boundingbox.d0.tmp")) {
+        yTotalList.push_back(element.id);
+    }
+    std::vector<int> diffTotal0;
+    std::vector<int> diffTotal1;
+    std::sort(xTotalList.begin(), xTotalList.end());
+    std::sort(yTotalList.begin(), yTotalList.end());
+
+    std::set_difference(xTotalList.begin(), xTotalList.end(), yTotalList.begin(), yTotalList.end(),
+                        std::inserter(diffTotal0, diffTotal0.begin()));
+    std::set_difference(yTotalList.begin(), yTotalList.end(), xTotalList.begin(), xTotalList.end(),
+                        std::inserter(diffTotal1, diffTotal1.begin()));*/
+    //GeoLocation test;
     //multiPolygonGeo m;
     //bg::read_wkt("MULTIPOLYGON(((6.0859436 50.7580645,6.0859881 50.7582046,6.0860374 50.7581984,6.0860460 50.7582255,6.0862678 50.7581973,6.0862594 50.7581708,6.0866540 50.7581207,6.0867201 50.7581123,6.0867354 50.7581603,6.0868121 50.7584019,6.0872680 50.7583439,6.0871550 50.7579880,6.0870223 50.7580049,6.0869902 50.7580090,6.0869831 50.7579865,6.0867916 50.7573839,6.0866235 50.7574053,6.0866417 50.7574623,6.0867314 50.7577444,6.0867755 50.7578832,6.0866545 50.7578986,6.0867048 50.7580568,6.0866710 50.7580611,6.0865367 50.7580782,6.0865118 50.7580000,6.0864775 50.7578917,6.0864619 50.7578427,6.0862767 50.7578662,6.0861611 50.7578809,6.0859437 50.7579086,6.0859913 50.7580585,6.0859436 50.7580645),(6.0868632 50.7581593,6.0870314 50.7581379,6.0870580 50.7582210,6.0868892 50.7582423,6.0868632 50.7581593)))", m);
     //std::cout << bg::wkt(test.convertWKTToBoundingBoxes("MULTIPOLYGON(((6.0859436 50.7580645,6.0859881 50.7582046,6.0860374 50.7581984,6.0860460 50.7582255,6.0862678 50.7581973,6.0862594 50.7581708,6.0866540 50.7581207,6.0867201 50.7581123,6.0867354 50.7581603,6.0868121 50.7584019,6.0872680 50.7583439,6.0871550 50.7579880,6.0870223 50.7580049,6.0869902 50.7580090,6.0869831 50.7579865,6.0867916 50.7573839,6.0866235 50.7574053,6.0866417 50.7574623,6.0867314 50.7577444,6.0867755 50.7578832,6.0866545 50.7578986,6.0867048 50.7580568,6.0866710 50.7580611,6.0865367 50.7580782,6.0865118 50.7580000,6.0864775 50.7578917,6.0864619 50.7578427,6.0862767 50.7578662,6.0861611 50.7578809,6.0859437 50.7579086,6.0859913 50.7580585,6.0859436 50.7580645),(6.0868632 50.7581593,6.0870314 50.7581379,6.0870580 50.7582210,6.0868892 50.7582423,6.0868632 50.7581593)))"));
@@ -502,7 +523,7 @@ void showCase() {
     //multiBoxGeo boxes = test.loadEntries("../germany_data_tidy.csv");
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    Rtree tree = Rtree();
+    //Rtree tree = Rtree();
     /*Node test_ = Node(7, test.createBoundingBox(0, 0, 1, 1));
     Node test_2 = Node(2, test.createBoundingBox(2, 2, 3, 3));
     Node test__2 = Node(42, test.createBoundingBox(123, 456, 789, 369));
@@ -515,7 +536,7 @@ void showCase() {
     auto duration_ = std::chrono::duration_cast<std::chrono::microseconds>(stopTime_ - startTime_);
     std::cout << "Loaded in " << duration_.count() / 1000000.0 << " seconds" << std::endl;
     auto startTime = std::chrono::high_resolution_clock::now();
-    tree.BuildTree(boxes, 16, "../switzerland_raw/rtree_build"); // took 1716.33 seconds for germany */
+    tree.BuildTree(boxes, 16, "../switzerland_raw/rtree_build_everything"); // took 1716.33 seconds for germany */
     //multiBoxGeo results = tree.SearchTree(test.createBoundingBox(5.9204, 50.9949, 5.92056, 50.995), "../germany_new");
     /*multiBoxGeo results = tree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland");
     for(rTreeValue result : results) {
@@ -533,9 +554,9 @@ void showCase() {
     }
     std::cout << "Found " << results.size() << " results:" << std::endl;*/
 
-    std::ifstream infile("../switzerland_raw/switzerland_raw.txt");
+    /*std::ifstream infile("../switzerland_raw/switzerland_raw_100k.txt");
     //std::filesystem::create_directory("../switzerland_raw");
-    std::ofstream convertOfs = std::ofstream("../switzerland_raw/test", std::ios::binary);
+    std::ofstream convertOfs = std::ofstream("../switzerland_raw/converted_data_100k", std::ios::binary);
 
     std::cout << "Loading" << std::endl;
 
@@ -544,7 +565,7 @@ void showCase() {
     {
         std::optional<boxGeo> boundingBox = Rtree::ConvertWordToRtreeEntry(line);
         if (boundingBox) {
-            Rtree::SaveEntries(boundingBox.value(), id, convertOfs);
+            Rtree::SaveEntry(boundingBox.value(), id, convertOfs);
         }
         id++;
     }
@@ -556,29 +577,21 @@ void showCase() {
 
     Rtree rtree = Rtree();
     multiBoxGeo entries = rtree.LoadEntries("../switzerland_raw/test");
-    rtree.BuildTree(entries, 16, "../switzerland_raw/rtree_build");
+    rtree.BuildTree(entries, 16, "../switzerland_raw/rtree_build_everything");
 
-    std::cout << "Finished building the Rtree with " << entries.size() << " entries" << std::endl;
+    std::cout << "Finished building the Rtree with " << entries.size() << " entries" << std::endl;*/
 
     //std::cout << tree.time << std::endl;
 
-
-    // 2.46108
-    // 6.6e-05
-    // 0.003989
-    // 3.536
-    // 1.45942
-
-    // 0.000134 for string search
-    // 0.000277 for substring
-    // 1.47477 for wkt parsing
-
-    /*polygonGeo polygon;
-    bg::read_wkt("POLYGON((1 1, 1 10, 10 10, 10 1, 1 1),(2 2,9 2,9 9,2 9,2 2))", polygon);
-    //bg::read_wkt("POLYGON ((35 10, 45 45, 15 40, 10 20, 35 10),(20 30, 35 35, 30 20, 20 30))", polygon);
-    //bg::correct(polygon);
-    std::cout << bg::wkt(polygon) << std::endl;
-    std::cout << (bg::is_valid(polygon) ? "valid" : "invalid") << std::endl;*/
+    Rtree rtree = Rtree(40000000000);
+    rtree.BuildTree("../switzerland_raw/converted_data_100k", 16, "../switzerland_raw/rtree_build");
+    //multiBoxGeo results = rtree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland_raw/rtree_build");
+    /*multiBoxGeo results = rtree.SearchTree(Rtree::createBoundingBox(9.88657, 47.38431, 9.88671, 47.6088), "../switzerland_raw/rtree_build");
+    for(RTreeValue result : results) {
+        std::cout << result.box.min_corner().get<0>() << " " << result.box.min_corner().get<1>() << "," << result.box.max_corner().get<0>()
+                  << " " << result.box.max_corner().get<1>() << "," << result.id << std::endl;
+    }
+    std::cout << "Found " << results.size() << " results" << std::endl;*/
 
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
