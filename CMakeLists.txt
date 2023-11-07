@@ -3,10 +3,17 @@ project(Bachelorprojekt)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_library(rtree Rtree/Rtree.cpp
+add_library(rtree
+        Rtree/Rtree.h
+        Rtree/Rtree.cpp
         Rtree/RtreeBuild.cpp
+        Rtree/RtreeFileReader.cpp
         Rtree/RtreeFileReader.h
-        ExternalSorting.cpp)
+        ExternalSorting.cpp
+        Rtree/RtreeBasicGeometry.h
+        Rtree/RtreeNode.cpp
+        Rtree/RtreeNode.h
+        Rtree/RtreeSorter.cpp)
 target_link_libraries(rtree Boost::serialization Boost::program_options Boost::iostreams)
 
 add_executable(Bachelorprojekt main.cpp)
