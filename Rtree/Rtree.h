@@ -2,12 +2,20 @@
 //                  Chair of Algorithms and Data Structures.
 //  Author: Noah Nock <noah.v.nock@gmail.com>
 
-#ifndef QLEVER_RTREE_H
-#define QLEVER_RTREE_H
+#ifndef BACHELORPROJEKT_RTREE_H
+#define BACHELORPROJEKT_RTREE_H
+
+#ifndef EOF
+#define EOF std::char_traits<char>::eof()
+#endif
+#include <boost/serialization/version.hpp>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <optional>
+#include <variant>
 
 #include "./RtreeBasicGeometry.h"
-#include <boost/serialization/version.hpp>
-#include <fstream>
 
 // ___________________________________________________________________________
 // Forward declaration
@@ -46,13 +54,14 @@ private:
 
 public:
     // ___________________________________________________________________________
-    // Build the whole Rtree with the raw data in onDiskBase + ".boundingbox.tmp",
-    // M as branching factor and folder as Rtree destination
-    void BuildTree(const std::string& onDiskBase, size_t M,
-                   const std::string& folder) const;
+    // Build the whole Rtree with the raw data in onDiskBase + fileSuffix +
+    // ".tmp", M as branching factor and folder as Rtree destination
+    uint64_t BuildTree(const std::string& onDiskBase, const std::string& fileSuffix,
+                       size_t M, const std::string& folder) const;
     // ___________________________________________________________________________
     // Search for an intersection of query with any elements of the Rtree
-    static multiBoxGeo SearchTree(BasicGeometry::BoundingBox query, const std::string& folder);
+    static multiBoxGeo SearchTree(BasicGeometry::BoundingBox query,
+                                  const std::string& folder);
     explicit Rtree(uintmax_t maxBuildingRamUsage);
 };
 
@@ -60,7 +69,7 @@ public:
 // Data structure handling the datapoints of the Rtree sorted in x and y
 // direction (either on ram or on disk)
 class OrderedBoxes {
-private:
+public: // TODO
     bool workInRam_{};
     uint64_t size_{};
     BasicGeometry::BoundingBox boundingBox_{};
@@ -83,9 +92,9 @@ private:
     SplitResult GetBestSplit();
     // ___________________________________________________________________________
     // Actually splitting the rectangles at the given split by splitResult
-    std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> PerformSplit(
-            SplitResult splitResult, SplitBuffers& splitBuffers, size_t M,
-            size_t S, uint64_t maxBuildingRamUsage = 0);
+    std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox>
+    PerformSplit(SplitResult splitResult, SplitBuffers& splitBuffers, size_t M,
+                 size_t S, uint64_t maxBuildingRamUsage = 0);
 
 public:
     [[nodiscard]] bool WorkInRam() const;
@@ -143,4 +152,4 @@ struct SplitBuffers {
     RectanglesForOrderedBoxes& rectsD1Split1;
 };
 
-#endif  // QLEVER_RTREE_H
+#endif  // BACHELORPROJEKT_RTREE_H

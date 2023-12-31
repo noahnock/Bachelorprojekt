@@ -2,8 +2,8 @@
 //                  Chair of Algorithms and Data Structures.
 //  Author: Noah Nock <noah.v.nock@gmail.com>
 
-#ifndef QLEVER_NODE_H
-#define QLEVER_NODE_H
+#ifndef BACHELORPROJEKT_NODE_H
+#define BACHELORPROJEKT_NODE_H
 
 #include "./Rtree.h"
 
@@ -30,20 +30,30 @@ protected:
 
 public:
     RtreeNode();
-    explicit RtreeNode(uint64_t id, BasicGeometry::BoundingBox boundingBox = {}, bool isLastInnerNode = false, multiBoxGeo children = {});
+    explicit RtreeNode(uint64_t id, BasicGeometry::BoundingBox boundingBox = {},
+                       bool isLastInnerNode = false, multiBoxGeo children = {});
     [[nodiscard]] uint64_t GetId() const;
     [[nodiscard]] BasicGeometry::BoundingBox GetBoundingBox() const;
     void AddChild(RtreeNode& child);
     void SetIsLastInnerNode(bool isLast);
     [[nodiscard]] bool GetIsLastInnerNode() const;
     multiBoxGeo GetChildren();
+
+    bool operator==(const RtreeNode& other) const
+    {
+        if (id_ != other.id_) return false;
+        if (!BasicGeometry::BoundingBoxesAreEqual(boundingBox_, other.boundingBox_)) return false;
+        if (isLastInnerNode_ != other.isLastInnerNode_) return false;
+        if (children_ != other.children_) return false;
+        return true;
+    }
 };
 
 BOOST_CLASS_VERSION(RtreeNode, 1)
 
 // ___________________________________________________________________________
-// Subclass of the RtreeNode only needed while constructing the Rtree (it keeps track
-// of the remaining OrderedBoxes of the subtree)
+// Subclass of the RtreeNode only needed while constructing the Rtree (it keeps
+// track of the remaining OrderedBoxes of the subtree)
 class ConstructionNode : public RtreeNode {
 private:
     OrderedBoxes orderedBoxes_;
@@ -54,5 +64,4 @@ public:
     void AddChildrenToItem();
 };
 
-
-#endif //QLEVER_NODE_H
+#endif  // BACHELORPROJEKT_NODE_H

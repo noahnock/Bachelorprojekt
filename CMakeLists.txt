@@ -13,7 +13,8 @@ add_library(rtree
         Rtree/RtreeBasicGeometry.h
         Rtree/RtreeNode.cpp
         Rtree/RtreeNode.h
-        Rtree/RtreeSorter.cpp)
+        Rtree/RtreeSorter.cpp
+        Rtree/RtreeSorter.h)
 target_link_libraries(rtree Boost::serialization Boost::program_options Boost::iostreams)
 
 add_executable(Bachelorprojekt main.cpp)

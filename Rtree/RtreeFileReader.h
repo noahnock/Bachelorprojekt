@@ -2,8 +2,8 @@
 //                  Chair of Algorithms and Data Structures.
 //  Author: Noah Nock <noah.v.nock@gmail.com>
 
-#ifndef QLEVER_RTREEFILEREADER_H
-#define QLEVER_RTREEFILEREADER_H
+#ifndef BACHELORPROJEKT_RTREEFILEREADER_H
+#define BACHELORPROJEKT_RTREEFILEREADER_H
 
 #include "./Rtree.h"
 #include "./RtreeNode.h"
@@ -21,15 +21,19 @@ public:
     static multiBoxWithOrderIndex LoadEntriesWithOrderIndex(
             const std::filesystem::path& file);
     // ___________________________________________________________________________
-    // Save the current node in the building process to disk and return the position of the node in the file
+    // Save the current node in the building process to disk and return the
+    // position of the node in the file
     static uint64_t SaveNode(RtreeNode& node, std::ofstream& nodesOfs);
     // ___________________________________________________________________________
     // Load a specific RtreeNode to query in its children
-    static RtreeNode LoadNode(uint64_t id, std::ifstream& lookupIfs, std::ifstream& nodesIfs);
+    static RtreeNode LoadNode(uint64_t id, std::ifstream& lookupIfs,
+                              std::ifstream& nodesIfs);
 
-    explicit FileReader(const std::filesystem::path& filename) : file_(filename) {}
+    explicit FileReader(const std::filesystem::path& filename)
+            : file_(filename) {}
 
-    class iterator : public std::iterator<std::input_iterator_tag, std::filesystem::path> {
+    class iterator
+            : public std::iterator<std::input_iterator_tag, std::filesystem::path> {
     public:
         explicit iterator(std::ifstream& in) : input_(in) {
             ++(*this);  // Read the first element
@@ -39,7 +43,9 @@ public:
 
         iterator& operator++();
 
-        const RTreeValueWithOrderIndex& operator*() const { return currentElement_; }
+        const RTreeValueWithOrderIndex& operator*() const {
+            return currentElement_;
+        }
 
         bool operator!=(const iterator& other) const {
             return valid_ != other.valid_;
@@ -73,7 +79,8 @@ public:
     explicit FileReaderWithoutIndex(const std::filesystem::path& filename)
             : file_(filename) {}
 
-    class iterator : public std::iterator<std::input_iterator_tag, std::filesystem::path> {
+    class iterator
+            : public std::iterator<std::input_iterator_tag, std::filesystem::path> {
     public:
         explicit iterator(std::ifstream& in) : input_(in) {
             ++(*this);  // Read the first element
@@ -104,4 +111,4 @@ private:
     std::ifstream file_;
 };
 
-#endif  // QLEVER_RTREEFILEREADER_H
+#endif  // BACHELORPROJEKT_RTREEFILEREADER_H

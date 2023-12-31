@@ -3,18 +3,10 @@
 //  Author: Noah Nock <noah.v.nock@gmail.com>
 #include "./Rtree.h"
 #include "./RtreeFileReader.h"
-#include "./RtreeSorter.cpp"
+#include "./RtreeSorter.h"
 
-static bool isBorderOfSplitCandidate(uint64_t current, uint64_t splitSize,
-                                     uint64_t M) {
-    if (((current + 1) % splitSize == 0 && (current + 1) / splitSize < M) ||
-        (current % splitSize == 0 && current / splitSize >= 1))
-        return true;
-    return false;
-}
-
-static double costFunctionTGS(BasicGeometry::BoundingBox& b0, BasicGeometry::BoundingBox& b1,
-                              size_t dim) {
+static double costFunctionTGS(BasicGeometry::BoundingBox& b0,
+                              BasicGeometry::BoundingBox& b1, size_t dim) {
     /**
      * The cost function determines the quality of a split. The lower the cost,
      * the better the split. Each split gets represented by the resulting bounding
@@ -68,9 +60,10 @@ static std::vector<OrderedBoxes> TGSRecursive(
     return result;
 }
 
-void Rtree::BuildTree(const std::string& onDiskBase, size_t M,
-                      const std::string& folder) const {
-    const std::filesystem::path file = onDiskBase + ".boundingbox.tmp";
+uint64_t Rtree::BuildTree(const std::string& onDiskBase,
+                          const std::string& fileSuffix, size_t M,
+                          const std::string& folder) const {
+    const std::filesystem::path file = onDiskBase + fileSuffix + ".tmp";
 
     // sort the rectangles
     uint64_t fileLines =
@@ -81,9 +74,10 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M,
             4 <
             this->maxBuildingRamUsage_;
 
+    std::cout << "Sorting" << (workInRam ? " in ram..." : " on disk...") << std::endl;
     OrderedBoxes orderedInputRectangles =
-            SortInput(onDiskBase, M, maxBuildingRamUsage_, workInRam);
-    std::cout << "Finished initial sorting" << std::endl;
+            SortInput(onDiskBase, fileSuffix, M, maxBuildingRamUsage_, workInRam);
+    uint64_t totalSize = orderedInputRectangles.GetSize();
 
     // prepare the files
     std::filesystem::create_directory(folder);
@@ -112,15 +106,15 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M,
             uint64_t nodePtr = FileReader::SaveNode(currentItem, nodesOfs);
             lookup[currentItem.GetId()] = nodePtr;
         } else {
-            size_t S = std::ceil(((double)currentItem.GetOrderedBoxes().GetSize()) / ((double)M));
+            size_t S = std::ceil(((double)currentItem.GetOrderedBoxes().GetSize()) /
+                                 ((double)M));
             if (currentItem.GetOrderedBoxes().GetSize() <= M * M) {
                 // in this case S can be just M
                 S = M;
             }
             std::vector<OrderedBoxes> tgsResult = TGSRecursive(
-                    onDiskBase + ".boundingbox." + std::to_string(layer),
-                    &currentItem.GetOrderedBoxes(), M, S,
-                    this->maxBuildingRamUsage_);
+                    onDiskBase + fileSuffix + "." + std::to_string(layer),
+                    &currentItem.GetOrderedBoxes(), M, S, this->maxBuildingRamUsage_);
             for (OrderedBoxes& currentOrderedRectangles : tgsResult) {
                 ConstructionNode newItem =
                         ConstructionNode(newId, currentOrderedRectangles);
@@ -144,6 +138,8 @@ void Rtree::BuildTree(const std::string& onDiskBase, size_t M,
         lookupOfs.write(reinterpret_cast<const char*>(&nodePtr), sizeof(uint64_t));
     }
     lookupOfs.close();
+
+    return totalSize;
 }
 
 bool OrderedBoxes::WorkInRam() const { return this->workInRam_; }
@@ -161,14 +157,15 @@ void OrderedBoxes::SetOrderedBoxesToRam(RectanglesForOrderedBoxes rectanglesD0,
     this->workInRam_ = true;
     this->rectsD0_ = std::move(rectanglesD0);
     this->rectsD1_ = std::move(rectanglesD1);
-    this->size_ = std::get<multiBoxWithOrderIndex>(this->rectsD0_.rectangles).size();
+    this->size_ =
+            std::get<multiBoxWithOrderIndex>(this->rectsD0_.rectangles).size();
     this->boundingBox_ = box;
 }
 
-void OrderedBoxes::SetOrderedBoxesToDisk(
-        RectanglesForOrderedBoxes rectanglesD0,
-        RectanglesForOrderedBoxes rectanglesD1, uint64_t size,
-        BasicGeometry::BoundingBox box) {
+void OrderedBoxes::SetOrderedBoxesToDisk(RectanglesForOrderedBoxes rectanglesD0,
+                                         RectanglesForOrderedBoxes rectanglesD1,
+                                         uint64_t size,
+                                         BasicGeometry::BoundingBox box) {
     this->workInRam_ = false;
     this->rectsD0_ = std::move(rectanglesD0);
     this->rectsD1_ = std::move(rectanglesD1);
@@ -176,7 +173,9 @@ void OrderedBoxes::SetOrderedBoxesToDisk(
     this->boundingBox_ = box;
 }
 
-BasicGeometry::BoundingBox OrderedBoxes::GetBoundingBox() { return this->boundingBox_; }
+BasicGeometry::BoundingBox OrderedBoxes::GetBoundingBox() {
+    return this->boundingBox_;
+}
 
 uint64_t OrderedBoxes::GetSize() const { return this->size_; }
 
@@ -294,10 +293,11 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestInRam(size_t S,
     RectanglesForOrderedBoxes rectsD0Split1;
     RectanglesForOrderedBoxes rectsD1Split1;
 
-    struct SplitBuffers splitBuffers = {rectsD0Split0, rectsD1Split0, rectsD0Split1, rectsD1Split1};
+    struct SplitBuffers splitBuffers = {rectsD0Split0, rectsD1Split0,
+                                        rectsD0Split1, rectsD1Split1};
 
-    std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> boundingBoxes =
-            PerformSplit(splitResult, splitBuffers, M, S);
+    std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox>
+            boundingBoxes = PerformSplit(splitResult, splitBuffers, M, S);
 
     split0.SetOrderedBoxesToRam(rectsD0Split0, rectsD1Split0,
                                 boundingBoxes.first);
@@ -324,10 +324,13 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestOnDisk(
     RectanglesForOrderedBoxes rectsD1Split0;
     RectanglesForOrderedBoxes rectsD0Split1;
     RectanglesForOrderedBoxes rectsD1Split1;
-    struct SplitBuffers splitBuffers = {rectsD0Split0, rectsD1Split0, rectsD0Split1, rectsD1Split1};
+    struct SplitBuffers splitBuffers = {rectsD0Split0, rectsD1Split0,
+                                        rectsD0Split1, rectsD1Split1};
 
     // perfrom the split
-    auto sizeLeft = (uint64_t)(std::ceil(((double)splitResult.bestIndex - 2.0) / 2.0) * (double)S);
+    auto sizeLeft =
+            (uint64_t)(std::ceil(((double)splitResult.bestIndex - 2.0) / 2.0) *
+                       (double)S);
     uint64_t sizeRight = this->size_ - sizeLeft;
     uint64_t split0ByteSize =
             sizeLeft * (4 * sizeof(double) + sizeof(uint64_t) + 2 * sizeof(uint64_t));
@@ -346,7 +349,8 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestOnDisk(
         splitBuffers.rectsD1Split1.rectangles = filePath + ".1.dim1.tmp";
     }
 
-    std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> boundingBoxes =
+    std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox>
+            boundingBoxes =
             PerformSplit(splitResult, splitBuffers, M, S, maxBuildingRamUsage);
 
     if (!split0InRam) {
@@ -365,26 +369,32 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestOnDisk(
                                     boundingBoxes.second);
     }
 
-    std::remove(std::get<std::filesystem::path>(this->rectsD0_.rectangles).c_str());
-    std::remove(std::get<std::filesystem::path>(this->rectsD1_.rectangles).c_str());
+    std::remove(
+            std::get<std::filesystem::path>(this->rectsD0_.rectangles).c_str());
+    std::remove(
+            std::get<std::filesystem::path>(this->rectsD1_.rectangles).c_str());
 
     return std::make_pair(split0, split1);
 }
 
-std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::PerformSplit(
-        SplitResult splitResult, SplitBuffers& splitBuffers, size_t M, size_t S,
-        uint64_t maxBuildingRamUsage) {
+std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox>
+OrderedBoxes::PerformSplit(SplitResult splitResult, SplitBuffers& splitBuffers,
+                           size_t M, size_t S, uint64_t maxBuildingRamUsage) {
     /**
      * Perform the best split on the current ordered boxes in the disk case
      */
 
-    auto sizeLeft = (uint64_t)(std::ceil(((double)splitResult.bestIndex - 2.0) / 2.0) * (double)S);
+    auto sizeLeft =
+            (uint64_t)(std::ceil(((double)splitResult.bestIndex - 2.0) / 2.0) *
+                       (double)S);
     uint64_t sizeRight = this->size_ - sizeLeft;
-    size_t SSplit0 = sizeLeft <= S ? (size_t)std::ceil((double)sizeLeft / (double)M) : S;
+    size_t SSplit0 =
+            sizeLeft <= S ? (size_t)std::ceil((double)sizeLeft / (double)M) : S;
     if (sizeLeft <= S && sizeLeft <= M * M) {
         SSplit0 = M;
     }
-    size_t SSplit1 = sizeRight <= S ? (size_t)std::ceil((double)sizeRight / (double)M) : S;
+    size_t SSplit1 =
+            sizeRight <= S ? (size_t)std::ceil((double)sizeRight / (double)M) : S;
     if (sizeRight <= S && sizeRight <= M * M) {
         SSplit1 = M;
     }
@@ -397,8 +407,10 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
     bool split1InRam =
             maxBuildingRamUsage == 0 || split1ByteSize * 4 < maxBuildingRamUsage;
 
-    BasicGeometry::BoundingBox boxSplit0 = BasicGeometry::CreateBoundingBox(0, 0, 0, 0);
-    BasicGeometry::BoundingBox boxSplit1 = BasicGeometry::CreateBoundingBox(0, 0, 0, 0);
+    BasicGeometry::BoundingBox boxSplit0 =
+            BasicGeometry::CreateBoundingBox(0, 0, 0, 0);
+    BasicGeometry::BoundingBox boxSplit1 =
+            BasicGeometry::CreateBoundingBox(0, 0, 0, 0);
 
     RTreeValueWithOrderIndex minSplit0OtherDim;
     RTreeValueWithOrderIndex maxSplit0OtherDim;
@@ -410,7 +422,9 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
         multiBoxWithOrderIndex* smallSplit1;
     } otherDimension{};
 
-    auto pushSmallBoundaries = [splitResult](multiBoxWithOrderIndex& smallListS0, multiBoxWithOrderIndex& smallListS1) {
+    auto pushSmallBoundaries = [splitResult](
+            multiBoxWithOrderIndex& smallListS0,
+            multiBoxWithOrderIndex& smallListS1) {
         smallListS0.push_back(splitResult.bestMinElement);
         smallListS0.push_back(splitResult.bestLastElement);
         smallListS1.push_back(splitResult.bestElement);
@@ -418,7 +432,8 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
     };
 
     if (splitResult.bestDim == 0) {
-        pushSmallBoundaries(splitBuffers.rectsD0Split0.rectanglesSmall, splitBuffers.rectsD0Split1.rectanglesSmall);
+        pushSmallBoundaries(splitBuffers.rectsD0Split0.rectanglesSmall,
+                            splitBuffers.rectsD0Split1.rectanglesSmall);
 
         // placeholder, since we need the min and max element of the split in the
         otherDimension.smallSplit0 = &splitBuffers.rectsD1Split0.rectanglesSmall;
@@ -429,7 +444,8 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
         otherDimension.smallSplit1->emplace_back();
         otherDimension.smallSplit1->emplace_back();
     } else {
-        pushSmallBoundaries(splitBuffers.rectsD1Split0.rectanglesSmall, splitBuffers.rectsD1Split1.rectanglesSmall);
+        pushSmallBoundaries(splitBuffers.rectsD1Split0.rectanglesSmall,
+                            splitBuffers.rectsD1Split1.rectanglesSmall);
 
         // placeholder
         otherDimension.smallSplit0 = &splitBuffers.rectsD0Split0.rectanglesSmall;
@@ -442,8 +458,14 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
     }
 
     std::optional<RTreeValueWithOrderIndex> elementOpt;
-    std::filesystem::path rectsD0Path = !this->workInRam_ ? std::get<std::filesystem::path>(this->rectsD0_.rectangles) : "";
-    std::filesystem::path rectsD1Path = !this->workInRam_ ? std::get<std::filesystem::path>(this->rectsD1_.rectangles) : "";
+    std::filesystem::path rectsD0Path =
+            !this->workInRam_
+            ? std::get<std::filesystem::path>(this->rectsD0_.rectangles)
+            : "";
+    std::filesystem::path rectsD1Path =
+            !this->workInRam_
+            ? std::get<std::filesystem::path>(this->rectsD1_.rectangles)
+            : "";
     FileReader fileReaderDim0 = FileReader(rectsD0Path);
     FileReader fileReaderDim1 = FileReader(rectsD1Path);
     FileReader::iterator fileReaderDim0Iterator =
@@ -460,18 +482,28 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
     std::optional<std::ofstream> rectanglesOnDiskS1D0Stream = {};
     std::optional<std::ofstream> rectanglesOnDiskS1D1Stream = {};
     if (!split0InRam && !this->workInRam_) {
-        rectanglesOnDiskS0D0Stream = std::ofstream(std::get<std::filesystem::path>(splitBuffers.rectsD0Split0.rectangles), std::ios::binary);
-        rectanglesOnDiskS0D1Stream = std::ofstream(std::get<std::filesystem::path>(splitBuffers.rectsD1Split0.rectangles), std::ios::binary);
+        rectanglesOnDiskS0D0Stream = std::ofstream(
+                std::get<std::filesystem::path>(splitBuffers.rectsD0Split0.rectangles),
+                std::ios::binary);
+        rectanglesOnDiskS0D1Stream = std::ofstream(
+                std::get<std::filesystem::path>(splitBuffers.rectsD1Split0.rectangles),
+                std::ios::binary);
     }
     if (!split1InRam && !this->workInRam_) {
-        rectanglesOnDiskS1D0Stream = std::ofstream(std::get<std::filesystem::path>(splitBuffers.rectsD0Split1.rectangles), std::ios::binary);
-        rectanglesOnDiskS1D1Stream = std::ofstream(std::get<std::filesystem::path>(splitBuffers.rectsD1Split1.rectangles), std::ios::binary);
+        rectanglesOnDiskS1D0Stream = std::ofstream(
+                std::get<std::filesystem::path>(splitBuffers.rectsD0Split1.rectangles),
+                std::ios::binary);
+        rectanglesOnDiskS1D1Stream = std::ofstream(
+                std::get<std::filesystem::path>(splitBuffers.rectsD1Split1.rectangles),
+                std::ios::binary);
     }
 
     auto performCertainSplit =
-            [M, &splitBuffers, &splitResult, &rectanglesOnDiskS0D0Stream, &rectanglesOnDiskS0D1Stream, &rectanglesOnDiskS1D0Stream, &rectanglesOnDiskS1D1Stream](
-                    size_t dim, size_t split, uint64_t& current,
-                    size_t& currentSplitSize, RTreeValueWithOrderIndex& minElement,
+            [M, &splitBuffers, &splitResult, &rectanglesOnDiskS0D0Stream,
+                    &rectanglesOnDiskS0D1Stream, &rectanglesOnDiskS1D0Stream,
+                    &rectanglesOnDiskS1D1Stream](
+                    size_t dim, size_t split, uint64_t& current, size_t& currentSplitSize,
+                    RTreeValueWithOrderIndex& minElement,
                     RTreeValueWithOrderIndex& maxElement, bool currentSplitInRam,
                     bool workInRam, RTreeValueWithOrderIndex& element,
                     BasicGeometry::BoundingBox& box) {
@@ -483,14 +515,16 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
                     if (dim == 0) {
                         currentSmallList = &splitBuffers.rectsD0Split0.rectanglesSmall;
                         if (currentSplitInRam || workInRam) {
-                            currentList = &std::get<multiBoxWithOrderIndex>(splitBuffers.rectsD0Split0.rectangles);
+                            currentList = &std::get<multiBoxWithOrderIndex>(
+                                    splitBuffers.rectsD0Split0.rectangles);
                         } else {
                             currentList = &rectanglesOnDiskS0D0Stream.value();
                         }
                     } else {
                         currentSmallList = &splitBuffers.rectsD1Split0.rectanglesSmall;
                         if (currentSplitInRam || workInRam) {
-                            currentList = &std::get<multiBoxWithOrderIndex>(splitBuffers.rectsD1Split0.rectangles);
+                            currentList = &std::get<multiBoxWithOrderIndex>(
+                                    splitBuffers.rectsD1Split0.rectangles);
                         } else {
                             currentList = &rectanglesOnDiskS0D1Stream.value();
                         }
@@ -499,14 +533,16 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
                     if (dim == 0) {
                         currentSmallList = &splitBuffers.rectsD0Split1.rectanglesSmall;
                         if (currentSplitInRam || workInRam) {
-                            currentList = &std::get<multiBoxWithOrderIndex>(splitBuffers.rectsD0Split1.rectangles);
+                            currentList = &std::get<multiBoxWithOrderIndex>(
+                                    splitBuffers.rectsD0Split1.rectangles);
                         } else {
                             currentList = &rectanglesOnDiskS1D0Stream.value();
                         }
                     } else {
                         currentSmallList = &splitBuffers.rectsD1Split1.rectanglesSmall;
                         if (currentSplitInRam || workInRam) {
-                            currentList = &std::get<multiBoxWithOrderIndex>(splitBuffers.rectsD1Split1.rectangles);
+                            currentList = &std::get<multiBoxWithOrderIndex>(
+                                    splitBuffers.rectsD1Split1.rectangles);
                         } else {
                             currentList = &rectanglesOnDiskS1D1Stream.value();
                         }
@@ -517,19 +553,27 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
                 if (currentSplitInRam || workInRam) {
                     std::get<multiBoxWithOrderIndex*>(currentList)->push_back(element);
                 } else {
-                    FileReader::SaveEntryWithOrderIndex(element, *(std::get<std::ofstream*>(currentList)));
+                    FileReader::SaveEntryWithOrderIndex(
+                            element, *(std::get<std::ofstream*>(currentList)));
                 }
 
                 // check if the element is at the position i * S (described in the
                 // algorithm) or one before it. In this case it is a future possible
                 // split position and needs to be saved to the "small list"
-                if (isBorderOfSplitCandidate(current, currentSplitSize, M)) {
+                if (BasicGeometry::IsBorderOfSplitCandidate(current, currentSplitSize,
+                                                            M)) {
                     // index i * S - 1 or i * S
                     currentSmallList->push_back(element);
                 }
 
                 // update the boundingbox to get the whole boundingbox of the split
-                if (dim == 0) box = BasicGeometry::CombineBoundingBoxes(box, element.box);
+                if (dim == 0) {
+                    if (current == 0) {
+                        box = element.box;
+                    } else {
+                        box = BasicGeometry::CombineBoundingBoxes(box, element.box);
+                    }
+                }
 
                 // keep track of the min and max element of the split, to later
                 // replace the placeholder in the "small lists"
@@ -550,8 +594,10 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
         uint64_t i = 0;
 
         if (!this->workInRam_) {
-            if (dim == 0 && fileReaderDim0Iterator != FileReader::end()) elementOpt = *fileReaderDim0Iterator;
-            if (dim == 1 && fileReaderDim1Iterator != FileReader::end()) elementOpt = *fileReaderDim1Iterator;
+            if (dim == 0 && fileReaderDim0Iterator != FileReader::end())
+                elementOpt = *fileReaderDim0Iterator;
+            if (dim == 1 && fileReaderDim1Iterator != FileReader::end())
+                elementOpt = *fileReaderDim1Iterator;
         }
 
         while ((this->workInRam_ && i < this->size_) ||
@@ -560,8 +606,11 @@ std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox> OrderedBoxes::
 
             // get the current element, either from disk or from ram
             if (this->workInRam_) {
-                element = dim == 0 ? std::get<multiBoxWithOrderIndex>(this->rectsD0_.rectangles)[i]
-                                   : std::get<multiBoxWithOrderIndex>(this->rectsD1_.rectangles)[i];
+                element =
+                        dim == 0
+                        ? std::get<multiBoxWithOrderIndex>(this->rectsD0_.rectangles)[i]
+                        : std::get<multiBoxWithOrderIndex>(
+                                this->rectsD1_.rectangles)[i];
             } else {
                 element = elementOpt.value();
             }

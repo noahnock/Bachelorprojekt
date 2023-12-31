@@ -108,9 +108,9 @@ static void centerOrderingExt(multiBoxWithOrderIndex& boxes, size_t dim) {
     }
 }
 
-OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t maxBuildingRamUsage) {
+OrderedBoxes ExternalSort(const std::string& onDiskBase, const std::string& fileSuffix, size_t M, uintmax_t maxBuildingRamUsage) {
     OrderedBoxes orderedInputRectangles;
-    multiBoxGeo RectanglesD0 = FileReaderWithoutIndex::LoadEntries(onDiskBase + ".boundingbox.tmp");
+    multiBoxGeo RectanglesD0 = FileReaderWithoutIndex::LoadEntries(onDiskBase + fileSuffix + ".tmp");
 
     centerOrderingExt(RectanglesD0, 0);
 
@@ -120,7 +120,7 @@ OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t max
     double globalMaxX = -1;
     double globalMaxY = -1;
 
-    std::ofstream r0File = std::ofstream(onDiskBase + ".boundingbox.d0.tmp", std::ios::binary);
+    std::ofstream r0File = std::ofstream(onDiskBase + fileSuffix + ".d0.tmp", std::ios::binary);
     for (RTreeValue element : RectanglesD0) {
         RTreeValueWithOrderIndex entry = {{element.box, element.id}, xSize, 0};
         FileReader::SaveEntryWithOrderIndex(entry, r0File);
@@ -142,13 +142,13 @@ OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t max
     r0File.close();
     RectanglesD0.clear();
 
-    multiBoxWithOrderIndex RectanglesD1 = FileReader::LoadEntriesWithOrderIndex(onDiskBase + ".boundingbox.d0.tmp");
+    multiBoxWithOrderIndex RectanglesD1 = FileReader::LoadEntriesWithOrderIndex(onDiskBase + fileSuffix + ".d0.tmp");
     centerOrderingExt(RectanglesD1, 1);
 
     size_t currentS = std::ceil(((float) xSize) / ((float) M));
 
     uint64_t ySize = 0;
-    std::ofstream r1File = std::ofstream(onDiskBase + ".boundingbox.d1.tmp", std::ios::binary);
+    std::ofstream r1File = std::ofstream(onDiskBase + fileSuffix + ".d1.tmp", std::ios::binary);
     multiBoxWithOrderIndex r1Small = multiBoxWithOrderIndex();
     r1Small.push_back(RectanglesD1[0]);
     RTreeValueWithOrderIndex maxElementDim1 = RectanglesD1[RectanglesD1.size() - 1];
@@ -169,11 +169,11 @@ OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t max
     r1File.close();
     RectanglesD1.clear();
 
-    multiBoxWithOrderIndex RectanglesD0Second = FileReader::LoadEntriesWithOrderIndex(onDiskBase + ".boundingbox.d1.tmp");
+    multiBoxWithOrderIndex RectanglesD0Second = FileReader::LoadEntriesWithOrderIndex(onDiskBase + fileSuffix + ".d1.tmp");
     centerOrderingExt(RectanglesD0Second, 0);
 
     uint64_t currentX = 0;
-    std::ofstream r0FileSecond = std::ofstream(onDiskBase + ".boundingbox.d0.tmp", std::ios::binary);
+    std::ofstream r0FileSecond = std::ofstream(onDiskBase + fileSuffix + ".d0.tmp", std::ios::binary);
     multiBoxWithOrderIndex r0Small = multiBoxWithOrderIndex();
     r0Small.push_back(RectanglesD0Second[0]);
     r0Small.push_back(RectanglesD0Second[RectanglesD0Second.size() - 1]);
@@ -193,18 +193,18 @@ OrderedBoxes ExternalSort(const std::string& onDiskBase, size_t M, uintmax_t max
 
     BasicGeometry::BoundingBox boundingBox = BasicGeometry::CreateBoundingBox(globalMinX, globalMinY, globalMaxX, globalMaxY);
     RectanglesForOrderedBoxes d0WithOrder;
-    d0WithOrder.rectangles = onDiskBase + ".boundingbox.d0.tmp";
+    d0WithOrder.rectangles = onDiskBase + fileSuffix + ".d0.tmp";
     d0WithOrder.rectanglesSmall = r0Small;
     RectanglesForOrderedBoxes d1WithOrder;
-    d1WithOrder.rectangles = onDiskBase + ".boundingbox.d1.tmp";
+    d1WithOrder.rectangles = onDiskBase + fileSuffix + ".d1.tmp";
     d1WithOrder.rectanglesSmall = r1Small;
     orderedInputRectangles.SetOrderedBoxesToDisk(d0WithOrder, d1WithOrder, xSize, boundingBox);
     return orderedInputRectangles;
 }
 
-OrderedBoxes InternalSort(const std::string& onDiskBase, size_t M) {
+OrderedBoxes InternalSort(const std::string& onDiskBase, const std::string& fileSuffix, size_t M) {
     OrderedBoxes orderedInputRectangles;
-    multiBoxGeo RectanglesD0 = FileReaderWithoutIndex::LoadEntries(onDiskBase + ".boundingbox.tmp");
+    multiBoxGeo RectanglesD0 = FileReaderWithoutIndex::LoadEntries(onDiskBase + fileSuffix + ".tmp");
     centerOrderingExt(RectanglesD0, 0);
 
     double globalMinX = -1;
