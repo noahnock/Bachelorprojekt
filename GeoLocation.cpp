@@ -524,13 +524,13 @@ void showCase() {
     auto startTime = std::chrono::high_resolution_clock::now();
 
     //Rtree tree = Rtree();
-    /*Node test_ = Node(7, test.createBoundingBox(0, 0, 1, 1));
-    Node test_2 = Node(2, test.createBoundingBox(2, 2, 3, 3));
-    Node test__2 = Node(42, test.createBoundingBox(123, 456, 789, 369));
+    /*RtreeNode test_ = RtreeNode(7, test.createBoundingBox(0, 0, 1, 1));
+    RtreeNode test_2 = RtreeNode(2, test.createBoundingBox(2, 2, 3, 3));
+    RtreeNode test__2 = RtreeNode(42, test.createBoundingBox(123, 456, 789, 369));
     test_.AddChild(test_2);
     test_.AddChild(test__2);
     SaveNode(test_, false, "../test.bin");*/
-    //Node test_3 = loadNode("../test.bin");
+    //RtreeNode test_3 = loadNode("../test.bin");
     /*multiBoxGeo boxes = tree.LoadEntries("../switzerland_raw");
     auto stopTime_ = std::chrono::high_resolution_clock::now();
     auto duration_ = std::chrono::duration_cast<std::chrono::microseconds>(stopTime_ - startTime_);
@@ -586,12 +586,12 @@ void showCase() {
     Rtree rtree = Rtree(40000000000);
     rtree.BuildTree("../switzerland_raw/converted_data_100k", 16, "../switzerland_raw/rtree_build");
     //multiBoxGeo results = rtree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland_raw/rtree_build");
-    /*multiBoxGeo results = rtree.SearchTree(Rtree::createBoundingBox(9.88657, 47.38431, 9.88671, 47.6088), "../switzerland_raw/rtree_build");
+    multiBoxGeo results = rtree.SearchTree(BasicGeometry::CreateBoundingBox(9.88657, 47.38431, 9.88671, 47.6088), "../switzerland_raw/rtree_build");
     for(RTreeValue result : results) {
         std::cout << result.box.min_corner().get<0>() << " " << result.box.min_corner().get<1>() << "," << result.box.max_corner().get<0>()
                   << " " << result.box.max_corner().get<1>() << "," << result.id << std::endl;
     }
-    std::cout << "Found " << results.size() << " results" << std::endl;*/
+    std::cout << "Found " << results.size() << " results" << std::endl;
 
     auto stopTime = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
