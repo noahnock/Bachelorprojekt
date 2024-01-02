@@ -77,6 +77,13 @@ public:
         return true;
     }
 
+    static double AreaOfBoundingBox(BasicGeometry::BoundingBox box) {
+        return ((BasicGeometry::GetMaxX(box) -
+                           BasicGeometry::GetMinX(box)) *
+                          (BasicGeometry::GetMaxY(box) -
+                           BasicGeometry::GetMinY(box)));
+    }
+
     static bool IsBorderOfSplitCandidate(uint64_t current, uint64_t splitSize,
                                          uint64_t M) {
         if (((current + 1) % splitSize == 0 && (current + 1) / splitSize < M) ||

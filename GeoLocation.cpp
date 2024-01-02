@@ -521,7 +521,6 @@ void showCase() {
 
     // new tests
     //multiBoxGeo boxes = test.loadEntries("../germany_data_tidy.csv");
-    auto startTime = std::chrono::high_resolution_clock::now();
 
     //Rtree tree = Rtree();
     /*RtreeNode test_ = RtreeNode(7, test.createBoundingBox(0, 0, 1, 1));
@@ -583,14 +582,16 @@ void showCase() {
 
     //std::cout << tree.time << std::endl;
 
-    Rtree rtree = Rtree(40000000000);
-    rtree.BuildTree("../switzerland_raw/converted_data_100k", ".boundingbox", 16, "../switzerland_raw/rtree_build");
+    Rtree rtree = Rtree(400000000000);
+    //rtree.BuildTree("../switzerland_raw/converted_data_100k", ".boundingbox", 16, "../switzerland_raw/rtree_build");
     //multiBoxGeo results = rtree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland_raw/rtree_build");
-    multiBoxGeo results = rtree.SearchTree(BasicGeometry::CreateBoundingBox(9.88657, 47.38431, 9.88671, 47.6088), "../switzerland_raw/rtree_build");
-    for(RTreeValue result : results) {
+    rtree.SetupForSearch("../switzerland_raw/rtree_build");
+    auto startTime = std::chrono::high_resolution_clock::now();
+    multiBoxGeo results = rtree.SearchTree(BasicGeometry::CreateBoundingBox(9.88657, 47.38431, 9.88671, 47.6088));
+    /*for(RTreeValue result : results) {
         std::cout << result.box.min_corner().get<0>() << " " << result.box.min_corner().get<1>() << "," << result.box.max_corner().get<0>()
                   << " " << result.box.max_corner().get<1>() << "," << result.id << std::endl;
-    }
+    }*/
     std::cout << "Found " << results.size() << " results" << std::endl;
 
     auto stopTime = std::chrono::high_resolution_clock::now();

@@ -6,7 +6,48 @@
 #include "./RtreeSorter.h"
 
 static double costFunctionTGS(BasicGeometry::BoundingBox& b0,
-                              BasicGeometry::BoundingBox& b1, size_t dim) {
+                              BasicGeometry::BoundingBox& b1,
+                              double totalArea,
+                              uint64_t nB0,
+                              uint64_t nB1) {
+    /**
+     * The cost function determines the quality of a split. The lower the cost,
+     * the better the split. Each split gets represented by the resulting bounding
+     * boxes of the split pieces.
+     */
+    double cost;
+
+    // get the area of both boxes and the number of elements normed by the total area and total number of elements
+    double areaB0Perc = BasicGeometry::AreaOfBoundingBox(b0) / totalArea;
+    double areaB1Perc = BasicGeometry::AreaOfBoundingBox(b1) / totalArea;
+    uint64_t totalN = nB0 + nB1;
+    double nB0Perc = (double) nB0 / (double) totalN;
+    double nB1Perc = (double) nB1 / (double) totalN;
+
+    // parameter for tuning the weight of the number of elements
+    double alpha = 1;
+
+    // the cost represents the expected area of search space that results in the split
+    // by minimizing the cost you minimize the overlap and the difference in size of both splits
+    // the weighted addition represents the expected number of elements which should also be minimized
+    cost = std::pow(areaB0Perc, 2) + std::pow(areaB1Perc, 2);
+    cost += alpha * (areaB0Perc * nB0Perc + areaB1Perc * nB1Perc);
+
+    // The cost represents the overlap of the two boxes
+    /*if (dim == 0) {
+        cost = BasicGeometry::GetMaxX(b0) - BasicGeometry::GetMinX(b1);
+        cost = cost < 0 ? 0 : cost;
+    } else {
+        cost = BasicGeometry::GetMaxY(b0) - BasicGeometry::GetMinY(b1);
+        cost = cost < 0 ? 0 : cost;
+    }*/
+
+    return cost;
+}
+
+static double costFunctionTGS(BasicGeometry::BoundingBox& b0,
+                              BasicGeometry::BoundingBox& b1,
+                              size_t dim) {
     /**
      * The cost function determines the quality of a split. The lower the cost,
      * the better the split. Each split gets represented by the resulting bounding
@@ -187,7 +228,7 @@ std::filesystem::path OrderedBoxes::GetRectanglesOnDisk() {
     return std::get<std::filesystem::path>(this->rectsD0_.rectangles);
 }
 
-SplitResult OrderedBoxes::GetBestSplit() {
+SplitResult OrderedBoxes::GetBestSplit(size_t M) {
     /**
      * Determine based on the "small-lists", which split is the best for the
      * rtree.
@@ -203,6 +244,9 @@ SplitResult OrderedBoxes::GetBestSplit() {
     // (described in the algorithm) To perform the split better, the element
     // before it (S * i - 1) is saved as well
     bool currentlyAtSTimesI = false;
+
+    auto totalArea = BasicGeometry::AreaOfBoundingBox(this->boundingBox_);
+    uint64_t S = std::ceil(this->GetSize() / M);
 
     for (size_t dim = 0; dim < 2; dim++) {
         for (uint64_t i = 0; i < this->rectsD0_.rectanglesSmall.size(); i++) {
@@ -249,7 +293,12 @@ SplitResult OrderedBoxes::GetBestSplit() {
             BasicGeometry::BoundingBox b1 =
                     BasicGeometry::CreateBoundingBox(minXB1, minYB1, maxXB1, maxYB1);
 
-            double cost = costFunctionTGS(b0, b1, dim);
+            // size of b0 and b1
+            uint64_t nB0 = (i / 2) * S;
+            uint64_t nB1 = this->GetSize() - nB0;
+
+            double cost = costFunctionTGS(b0, b1, totalArea, nB0, nB1);
+            //double cost = costFunctionTGS(b0, b1, dim);
 
             if (splitResult.bestCost == -1 || cost < splitResult.bestCost) {
                 splitResult.bestCost = cost;
@@ -283,7 +332,7 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestInRam(size_t S,
      * perform it
      */
 
-    struct SplitResult splitResult = this->GetBestSplit();
+    struct SplitResult splitResult = this->GetBestSplit(M);
 
     OrderedBoxes split0;
     OrderedBoxes split1;
@@ -318,7 +367,7 @@ std::pair<OrderedBoxes, OrderedBoxes> OrderedBoxes::SplitAtBestOnDisk(
     OrderedBoxes split0;
     OrderedBoxes split1;
 
-    struct SplitResult splitResult = this->GetBestSplit();
+    struct SplitResult splitResult = this->GetBestSplit(M);
 
     RectanglesForOrderedBoxes rectsD0Split0;
     RectanglesForOrderedBoxes rectsD1Split0;

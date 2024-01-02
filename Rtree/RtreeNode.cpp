@@ -32,16 +32,19 @@ void ConstructionNode::AddChildrenToItem() {
         }
     }
 }
-
 OrderedBoxes& ConstructionNode::GetOrderedBoxes() {
     return this->orderedBoxes_;
 }
 
 void RtreeNode::AddChild(RtreeNode& child) {
-    BasicGeometry::BoundingBox box = child.GetBoundingBox();
-    uint64_t entryId = child.GetId();
-    RTreeValue entry = {box, entryId};
-    this->children_.push_back(entry);
+    if (!this->isSearchNode_) {
+        BasicGeometry::BoundingBox box = child.GetBoundingBox();
+        uint64_t entryId = child.GetId();
+        RTreeValue entry = {box, entryId};
+        this->children_.push_back(entry);
+    } else {
+        this->childNodes_.push_back(child);
+    }
 }
 
 BasicGeometry::BoundingBox RtreeNode::GetBoundingBox() const {
@@ -62,8 +65,28 @@ RtreeNode::RtreeNode(uint64_t id, BasicGeometry::BoundingBox boundingBox,
     this->boundingBox_ = boundingBox;
     this->children_ = std::move(children);
     this->isLastInnerNode_ = isLastInnerNode;
+    this->childNodes_ = std::vector<RtreeNode>();
+    this->isSearchNode_ = false;
+}
+
+void RtreeNode::SetIsSearchNode(bool isSearchNode) {
+    this->isSearchNode_ = isSearchNode;
+}
+
+void RtreeNode::ClearUnusedChildren() {
+    if (this->isSearchNode_) {
+        this->children_ = {};
+    } else {
+        this->childNodes_ = {};
+    }
+}
+
+std::vector<RtreeNode> RtreeNode::GetSearchChildren() {
+    return this->childNodes_;
 }
 
 bool RtreeNode::GetIsLastInnerNode() const { return this->isLastInnerNode_; }
+
+bool RtreeNode::GetIsSearchNode() const { return this->isSearchNode_; }
 
 multiBoxGeo RtreeNode::GetChildren() { return this->children_; }

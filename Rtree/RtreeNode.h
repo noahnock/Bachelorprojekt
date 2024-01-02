@@ -5,7 +5,7 @@
 #ifndef BACHELORPROJEKT_NODE_H
 #define BACHELORPROJEKT_NODE_H
 
-#include "./Rtree.h"
+#include "Rtree.h"
 
 // ___________________________________________________________________________
 // Data structure representing a single node of the Rtree containing the
@@ -17,8 +17,11 @@ protected:
     BasicGeometry::BoundingBox boundingBox_{};
     bool isLastInnerNode_ =
             false;  // when true, this means that the node is the last inner node and
-    // all of its children are leafs
-    multiBoxGeo children_;
+                    // all of its children are leafs
+    multiBoxGeo children_;  // these children are for reading from disk
+    // these children are used when they are loaded in cache
+    std::vector<RtreeNode> childNodes_{};
+    bool isSearchNode_ = false;
 
     template <class Archive>
     void serialize(Archive& a, [[maybe_unused]] const unsigned int version) {
@@ -36,8 +39,12 @@ public:
     [[nodiscard]] BasicGeometry::BoundingBox GetBoundingBox() const;
     void AddChild(RtreeNode& child);
     void SetIsLastInnerNode(bool isLast);
+    void ClearUnusedChildren();
     [[nodiscard]] bool GetIsLastInnerNode() const;
     multiBoxGeo GetChildren();
+    std::vector<RtreeNode> GetSearchChildren();
+    void SetIsSearchNode(bool isSearchNode);
+    [[nodiscard]]bool GetIsSearchNode() const;
 
     bool operator==(const RtreeNode& other) const
     {

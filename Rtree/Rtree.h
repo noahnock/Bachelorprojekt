@@ -14,11 +14,14 @@
 #include <fstream>
 #include <optional>
 #include <variant>
+#include <unordered_map>
 
 #include "./RtreeBasicGeometry.h"
+//#include "RtreeNode.h"
 
 // ___________________________________________________________________________
 // Forward declaration
+class RtreeNode;
 struct RTreeValue;
 struct RTreeValueWithOrderIndex;
 using multiBoxGeo = std::vector<RTreeValue>;
@@ -51,17 +54,19 @@ struct RectanglesForOrderedBoxes {
 class Rtree {
 private:
     uintmax_t maxBuildingRamUsage_;
+    std::string searchFolder_;
+    std::unique_ptr<RtreeNode> rootNode_;
 
 public:
     // ___________________________________________________________________________
     // Build the whole Rtree with the raw data in onDiskBase + fileSuffix +
     // ".tmp", M as branching factor and folder as Rtree destination
-    uint64_t BuildTree(const std::string& onDiskBase, const std::string& fileSuffix,
+    [[nodiscard]] uint64_t BuildTree(const std::string& onDiskBase, const std::string& fileSuffix,
                        size_t M, const std::string& folder) const;
     // ___________________________________________________________________________
     // Search for an intersection of query with any elements of the Rtree
-    static multiBoxGeo SearchTree(BasicGeometry::BoundingBox query,
-                                  const std::string& folder);
+    multiBoxGeo SearchTree(BasicGeometry::BoundingBox query);
+    void SetupForSearch(std::string folder);
     explicit Rtree(uintmax_t maxBuildingRamUsage);
 };
 
@@ -89,7 +94,7 @@ public: // TODO
     // ___________________________________________________________________________
     // Get the position and dimension of the best split possible to maximize the
     // quality of the Rtree
-    SplitResult GetBestSplit();
+    SplitResult GetBestSplit(size_t M);
     // ___________________________________________________________________________
     // Actually splitting the rectangles at the given split by splitResult
     std::pair<BasicGeometry::BoundingBox, BasicGeometry::BoundingBox>
