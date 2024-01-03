@@ -167,7 +167,8 @@ void Rtree::SetupForSearch(std::string folder) {
             sizeof(std::vector<RtreeNode>) + this->rootNode_->GetChildren().size() * sizeof(RTreeValue);
 
     int64_t totalMemoryEstimate = memoryEstimateOfNode;
-    int64_t memoryAllowed = this->maxBuildingRamUsage_ - totalMemoryEstimate;
+    int64_t memoryAllowed = this->maxBuildingRamUsage_ - totalMemoryEstimate; // TODO
+    memoryAllowed = 0;
 
     while (!nodesQueue.empty()) {
         RtreeNode currentNode = nodesQueue.front();
@@ -195,7 +196,7 @@ void Rtree::SetupForSearch(std::string folder) {
     lookupIfs.close();
     nodesIfs.close();
 
-    std::cout << "Done" << totalMemoryEstimate << std::endl;
+    std::cout << "Done" << std::endl;
 }
 
 Rtree::Rtree(uintmax_t maxBuildingRamUsage) {

@@ -582,12 +582,15 @@ void showCase() {
 
     //std::cout << tree.time << std::endl;
 
-    Rtree rtree = Rtree(400000000000);
+    Rtree rtree = Rtree(4000);
     //rtree.BuildTree("../switzerland_raw/converted_data_100k", ".boundingbox", 16, "../switzerland_raw/rtree_build");
+    //rtree.BuildTree("../Benchmarks/normal_sample", ".test", 16, "../switzerland_raw/rtree_build");
+    //multiBoxGeo results = rtree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland_raw/rtree_build");
     //multiBoxGeo results = rtree.SearchTree(test.createBoundingBox(7.73243, 45.2063, 7.73252, 45.2071), "../switzerland_raw/rtree_build");
     rtree.SetupForSearch("../switzerland_raw/rtree_build");
     auto startTime = std::chrono::high_resolution_clock::now();
-    multiBoxGeo results = rtree.SearchTree(BasicGeometry::CreateBoundingBox(9.88657, 47.38431, 9.88671, 47.6088));
+    //multiBoxGeo results = rtree.SearchTree(BasicGeometry::CreateBoundingBox(9.88657, 47.38431, 9.88671, 47.6088));
+    multiBoxGeo results = rtree.SearchTree(BasicGeometry::CreateBoundingBox(5.956142, 46.132035, 5.956142, 46.132035));
     /*for(RTreeValue result : results) {
         std::cout << result.box.min_corner().get<0>() << " " << result.box.min_corner().get<1>() << "," << result.box.max_corner().get<0>()
                   << " " << result.box.max_corner().get<1>() << "," << result.id << std::endl;

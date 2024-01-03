@@ -3,7 +3,7 @@
 #include "./RtreeBenchmark.cpp"
 
 int main() {
-    showCase();
-    //Benchmark();
+    //showCase();
+    Benchmark();
     return 0;
 }
