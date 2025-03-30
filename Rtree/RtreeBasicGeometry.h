@@ -95,7 +95,7 @@ public:
     // ___________________________________________________________________________
     // Convert a single wkt literal to a datapoint in the format suitable for the
     // Rtree
-    /*static std::optional<BoundingBox> ConvertWordToRtreeEntry(
+    /*static std::optional<BoundingBox> ConvertWordToRtreeEntry(  // TODO why commented out?
             const std::string& wkt) {
         /**
          * Convert a single wkt literal to a boundingbox.
@@ -157,7 +157,7 @@ struct RTreeValue {
 };
 
 // ___________________________________________________________________________
-// Data type for a value of the Rtree (id and boundingbox), with the addtional
+// Data type for a value of the Rtree (id and boundingbox), with the additional
 // information of its position in the x- and y-sorting. This is only used to
 // create the Rtree in a more efficient way
 struct RTreeValueWithOrderIndex : RTreeValue {

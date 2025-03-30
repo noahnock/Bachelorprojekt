@@ -12,7 +12,7 @@ static double costFunctionTGS(BasicGeometry::BoundingBox& b0,
      * the better the split. Each split gets represented by the resulting bounding
      * boxes of the split pieces.
      */
-    double cost;
+    double cost; // TODO
 
     // The cost represents the overlap of the two boxes
     double overlapX = BasicGeometry::GetMaxX(b0) - BasicGeometry::GetMinX(b1);
@@ -78,6 +78,7 @@ uint64_t Rtree::BuildTree(const std::string& onDiskBase,
     OrderedBoxes orderedInputRectangles =
             SortInput(onDiskBase, fileSuffix, M, maxBuildingRamUsage_, workInRam);
     uint64_t totalSize = orderedInputRectangles.GetSize();
+    std::cout << "Finished sorting" << std::endl;
 
     // prepare the files
     std::filesystem::create_directory(folder);
@@ -204,7 +205,7 @@ SplitResult OrderedBoxes::GetBestSplit(size_t M) {
     // before it (S * i - 1) is saved as well
     bool currentlyAtSTimesI = false;
 
-    auto totalArea = BasicGeometry::AreaOfBoundingBox(this->boundingBox_);
+    //auto totalArea = BasicGeometry::AreaOfBoundingBox(this->boundingBox_);  // TODO can be deleted?
     uint64_t S = std::ceil(this->GetSize() / M);
 
     for (size_t dim = 0; dim < 2; dim++) {
@@ -230,9 +231,9 @@ SplitResult OrderedBoxes::GetBestSplit(size_t M) {
                 continue;
             }
 
-            if (currentElement.id == maxElement.id) {
+            /*if (currentElement.id == maxElement.id) {
                 break;
-            }
+            }*/ // TODO
 
             currentlyAtSTimesI = false;
 

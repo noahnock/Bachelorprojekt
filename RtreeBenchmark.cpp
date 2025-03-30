@@ -72,7 +72,7 @@ std::pair<double, double> searchInBoostRtree(const std::string& file, std::vecto
     double totalTimeSearch = 0;
     uint64_t totalSize = 0;
 
-    for (size_t i = 0; i < 10; i++) {
+    for (size_t i = 0; i < 1; i++) {
         for (BasicGeometry::BoundingBox query : exampleQueries) {
             startTime = std::chrono::high_resolution_clock::now();
             multiBox results = tree.SearchInTree(query);
@@ -91,7 +91,7 @@ double searchRtree(Rtree& rtree, std::vector<BasicGeometry::BoundingBox>& exampl
     double totalTimeSearch = 0;
     uint64_t totalSize = 0;
 
-    for (size_t i = 0; i < 10; i++) {
+    for (size_t i = 0; i < 1; i++) {
         for (BasicGeometry::BoundingBox query : exampleQueries) {
             auto startTime = std::chrono::high_resolution_clock::now();
             multiBoxGeo results = rtree.SearchTree(query);
@@ -150,9 +150,9 @@ void createNormalDistSample(size_t n, double maxRelativeSize, const std::string&
     for (size_t i = 0; i < n; i++) {
         double x = distributionX(generator);
         double y = distributionY(generator);
-        double lengthX = lengthXAbs(generator);
+        double lengthX = std::abs(lengthXAbs(generator));
         double xHalf = lengthX / 2;
-        double lengthY = lengthYPerc(generator) * (maxArea / lengthX);
+        double lengthY = std::abs(lengthYPerc(generator)) * (maxArea / lengthX);
         double yHalf = lengthY / 2;
 
         BasicGeometry::BoundingBox box = BasicGeometry::CreateBoundingBox(x - xHalf, y - yHalf, x + xHalf, y + yHalf);
@@ -179,7 +179,7 @@ std::vector<BasicGeometry::BoundingBox> exampleQueries {
 };
 
 void Benchmark() {
-    const std::string onDiskBase = "../switzerland_raw/converted_data_100k";
+    const std::string onDiskBase = "../switzerland_raw/converted_data";
     const std::string sourceFile = onDiskBase + ".boundingbox.tmp";
     size_t sampleSize = 100000;
 
@@ -188,7 +188,7 @@ void Benchmark() {
     createUniformSample(sampleSize, 0.0001, ".0001");
     createNormalDistSample(sampleSize, 0.001, ".001");
     createNormalDistSample(sampleSize, 0.0001, ".0001");
-
+/*
     createUniformSample(100000, 0.0001, ".100k");
     createUniformSample(200000, 0.0001, ".200k");
     createUniformSample(300000, 0.0001, ".300k");
@@ -199,7 +199,169 @@ void Benchmark() {
     createUniformSample(800000, 0.0001, ".800k");
     createUniformSample(900000, 0.0001, ".900k");
     createUniformSample(1000000, 0.0001, ".1M");
+    */
 
+    // big Ms build 
+    std::ofstream output_building_bigM = std::ofstream("../Benchmarks/benchmark_building_bigM.txt");
+    auto logMessageBigM = [&output_building_bigM](const std::string& message) { logMessageWithStream(message, output_building_bigM); };
+    logMessageBigM("Building my own R-tree with big M on all datasets");
+
+    /*Rtree rtree256Uni = Rtree(99999999999);
+    auto startTime = std::chrono::high_resolution_clock::now();
+    rtree256Uni.BuildTree("../Benchmarks/uniform_sample", ".001", 256, "../Benchmarks/rtree_build_256_Uni");
+    auto stopTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 256: Uni Built in " + std::to_string(duration.count()));
+
+    Rtree rtree512Uni = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree512Uni.BuildTree("../Benchmarks/uniform_sample", ".001", 512, "../Benchmarks/rtree_build_512_Uni");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 512: Uni Built in " + std::to_string(duration.count()));
+
+    Rtree rtree1024Uni = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree1024Uni.BuildTree("../Benchmarks/uniform_sample", ".001", 1024, "../Benchmarks/rtree_build_1024_Uni");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 1024: Uni Built in " + std::to_string(duration.count()));
+
+    Rtree rtree2048Uni = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree2048Uni.BuildTree("../Benchmarks/uniform_sample", ".001", 2048, "../Benchmarks/rtree_build_2048_Uni");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 2048: Uni Built in " + std::to_string(duration.count()));
+
+    Rtree rtree256Norm = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree256Norm.BuildTree("../Benchmarks/normal_sample", ".001", 256, "../Benchmarks/rtree_build_256_Norm");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 256: Norm Built in " + std::to_string(duration.count()));
+
+    Rtree rtree512Norm = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree512Norm.BuildTree("../Benchmarks/normal_sample", ".001", 512, "../Benchmarks/rtree_build_512_Norm");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 512: Norm Built in " + std::to_string(duration.count()));
+
+    Rtree rtree1024Norm = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree1024Norm.BuildTree("../Benchmarks/normal_sample", ".001", 1024, "../Benchmarks/rtree_build_1024_Norm");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 1024: Norm Built in " + std::to_string(duration.count()));
+
+    Rtree rtree2048Norm = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree2048Norm.BuildTree("../Benchmarks/normal_sample", ".001", 2048, "../Benchmarks/rtree_build_2048_Norm");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 2048: Norm Built in " + std::to_string(duration.count()));
+
+    Rtree rtree256Swiss = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree256Swiss.BuildTree(onDiskBase, ".boundingbox", 256, "../Benchmarks/rtree_build_256");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 256: Swiss Built in " + std::to_string(duration.count()));
+*/
+    Rtree rtree512Swiss = Rtree(99999999999);
+    auto startTime = std::chrono::high_resolution_clock::now();
+    rtree512Swiss.BuildTree(onDiskBase, ".boundingbox", 512, "../Benchmarks/rtree_build_512");
+    auto stopTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 512: Swiss Built in " + std::to_string(duration.count()));
+
+    Rtree rtree1024Swiss = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree1024Swiss.BuildTree(onDiskBase, ".boundingbox", 1024, "../Benchmarks/rtree_build_1024");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 1024: Swiss Built in " + std::to_string(duration.count()));
+
+    Rtree rtree2048Swiss = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree2048Swiss.BuildTree(onDiskBase, ".boundingbox", 2048, "../Benchmarks/rtree_build_2048");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageBigM("M = 2048: Swiss Built in " + std::to_string(duration.count()));
+
+    output_building_bigM.close();
+
+
+    // searching big Ms
+    
+    Rtree rtree256Uni = Rtree(99999999999);
+    Rtree rtree512Uni = Rtree(99999999999);
+    Rtree rtree1024Uni = Rtree(99999999999);
+    Rtree rtree2048Uni = Rtree(99999999999);
+    Rtree rtree256Norm = Rtree(99999999999);
+    Rtree rtree512Norm = Rtree(99999999999);
+    Rtree rtree1024Norm = Rtree(99999999999);
+    Rtree rtree2048Norm = Rtree(99999999999);
+    Rtree rtree256Swiss = Rtree(99999999999);
+    //Rtree rtree512Swiss = Rtree(99999999999);
+    //Rtree rtree1024Swiss = Rtree(99999999999);
+    //Rtree rtree2048Swiss = Rtree(99999999999);
+    
+    std::ofstream output_search_bigM = std::ofstream("../Benchmarks/benchmark_search_bigM.txt");
+    auto logMessageSearchBigM = [&output_search_bigM](const std::string& message) { logMessageWithStream(message, output_search_bigM); };
+    logMessageSearchBigM("Search my own R-tree with different M");
+    
+    rtree256Uni.SetupForSearch("../Benchmarks/rtree_build_256_Uni");
+    double rtreeSearch256Uni = searchRtree(rtree256Uni, exampleQueries);
+    logMessageSearchBigM("M = 256: Uni Searched in " + std::to_string(rtreeSearch256Uni));
+
+    rtree512Uni.SetupForSearch("../Benchmarks/rtree_build_512_Uni");
+    double rtreeSearch512Uni = searchRtree(rtree512Uni, exampleQueries);
+    logMessageSearchBigM("M = 512: Uni Searched in " + std::to_string(rtreeSearch512Uni));
+
+    rtree1024Uni.SetupForSearch("../Benchmarks/rtree_build_1024_Uni");
+    double rtreeSearch1024Uni = searchRtree(rtree1024Uni, exampleQueries);
+    logMessageSearchBigM("M = 1024: Uni Searched in " + std::to_string(rtreeSearch1024Uni));
+
+    rtree2048Uni.SetupForSearch("../Benchmarks/rtree_build_2048_Uni");
+    double rtreeSearch2048Uni = searchRtree(rtree2048Uni, exampleQueries);
+    logMessageSearchBigM("M = 2048: Uni Searched in " + std::to_string(rtreeSearch2048Uni));
+
+    rtree256Norm.SetupForSearch("../Benchmarks/rtree_build_256_Norm");
+    double rtreeSearch256Norm = searchRtree(rtree256Norm, exampleQueries);
+    logMessageSearchBigM("M = 256: Norm Searched in " + std::to_string(rtreeSearch256Norm));
+
+    rtree512Norm.SetupForSearch("../Benchmarks/rtree_build_512_Norm");
+    double rtreeSearch512Norm = searchRtree(rtree512Norm, exampleQueries);
+    logMessageSearchBigM("M = 512: Norm Searched in " + std::to_string(rtreeSearch512Norm));
+
+    rtree1024Norm.SetupForSearch("../Benchmarks/rtree_build_1024_Norm");
+    double rtreeSearch1024Norm = searchRtree(rtree1024Norm, exampleQueries);
+    logMessageSearchBigM("M = 1024: Norm Searched in " + std::to_string(rtreeSearch1024Norm));
+
+    rtree2048Norm.SetupForSearch("../Benchmarks/rtree_build_2048_Norm");
+    double rtreeSearch2048Norm = searchRtree(rtree2048Norm, exampleQueries);
+    logMessageSearchBigM("M = 2048: Norm Searched in " + std::to_string(rtreeSearch2048Norm));
+
+    rtree256Swiss.SetupForSearch("../Benchmarks/rtree_build_256");
+    double rtreeSearch256Swiss = searchRtree(rtree256Swiss, exampleQueries);
+    logMessageSearchBigM("M = 256: Swiss Searched in " + std::to_string(rtreeSearch256Swiss));
+
+    rtree512Swiss.SetupForSearch("../Benchmarks/rtree_build_512");
+    double rtreeSearch512Swiss = searchRtree(rtree512Swiss, exampleQueries);
+    logMessageSearchBigM("M = 512: Swiss Searched in " + std::to_string(rtreeSearch512Swiss));
+
+    rtree1024Swiss.SetupForSearch("../Benchmarks/rtree_build_1024");
+    double rtreeSearch1024Swiss = searchRtree(rtree1024Swiss, exampleQueries);
+    logMessageSearchBigM("M = 1024: Swiss Searched in " + std::to_string(rtreeSearch1024Swiss));
+
+    rtree2048Swiss.SetupForSearch("../Benchmarks/rtree_build_2048");
+    double rtreeSearch2048Swiss = searchRtree(rtree2048Swiss, exampleQueries);
+    logMessageSearchBigM("M = 2048: Swiss Searched in " + std::to_string(rtreeSearch2048Swiss));
+    
+    output_search_bigM.close();
+    /*
     // building own R-tree
     std::ofstream output_building = std::ofstream("../Benchmarks/benchmark_building.txt");
     auto logMessage = [&output_building](const std::string& message) { logMessageWithStream(message, output_building); };
@@ -264,6 +426,13 @@ void Benchmark() {
 
     output_building.close();
 
+    Rtree rtree2 = Rtree(99999999999);
+    Rtree rtree4 = Rtree(99999999999);
+    Rtree rtree8 = Rtree(99999999999);
+    Rtree rtree16 = Rtree(99999999999);
+    Rtree rtree32 = Rtree(99999999999);
+    Rtree rtree64 = Rtree(99999999999);
+    Rtree rtree128 = Rtree(99999999999);
     // R-tree search
     std::ofstream output_search = std::ofstream("../Benchmarks/benchmark_search.txt");
     auto logMessageSearch = [&output_search](const std::string& message) { logMessageWithStream(message, output_search); };
@@ -305,10 +474,10 @@ void Benchmark() {
     logMessageSizes("Building the R-tree on different dataset sizes");
 
     Rtree rtree100k = Rtree(99999999999);
-    startTime = std::chrono::high_resolution_clock::now();
+    auto startTime = std::chrono::high_resolution_clock::now();
     rtree100k.BuildTree("../Benchmarks/uniform_sample", ".100k", 64, "../Benchmarks/rtree_build_100k");
-    stopTime = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    auto stopTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
     logMessageSizes("100k Built in " + std::to_string(duration.count()));
 
     Rtree rtree200k = Rtree(99999999999);
@@ -377,7 +546,7 @@ void Benchmark() {
     output_sizes.close();
 
     // sample data boost vs mine
-    /*std::ofstream output_sample = std::ofstream("../Benchmarks/benchmark_sample.txt");
+    std::ofstream output_sample = std::ofstream("../Benchmarks/benchmark_sample.txt");
     auto logMessageSample = [&output_sample](const std::string& message) { logMessageWithStream(message, output_sample); };
     logMessageSample("Comparing boost and mine on different generated sample datasets");
 
@@ -406,26 +575,249 @@ void Benchmark() {
     logMessageSample("Normal 0.0001 with my R-tree: " + std::to_string(rtreeNorm0001Res));
 
     std::pair<double, double> boostUn001 = searchInBoostRtree<64>("../Benchmarks/uniform_sample.001.tmp", exampleQueries);
-    logMessageSample("Uniform 0.001 with boost R-tree: " + std::to_string(boostUn001.second));
+    logMessageSample("Uniform 0.001 with boost R-tree: Build: " + std::to_string(boostUn001.first) + " Search: " + std::to_string(boostUn001.second));
 
     std::pair<double, double> boostUn0001 = searchInBoostRtree<64>("../Benchmarks/uniform_sample.0001.tmp", exampleQueries);
-    logMessageSample("Uniform 0.0001 with boost R-tree: " + std::to_string(boostUn0001.second));
+    logMessageSample("Uniform 0.0001 with boost R-tree: Build: " + std::to_string(boostUn0001.first) + " Search: " + std::to_string(boostUn0001.second));
 
     std::pair<double, double> boostNorm001 = searchInBoostRtree<64>("../Benchmarks/normal_sample.001.tmp", exampleQueries);
-    logMessageSample("Normal 0.001 with boost R-tree: " + std::to_string(boostNorm001.second));
+    logMessageSample("Normal 0.001 with boost R-tree: Build: " + std::to_string(boostNorm001.first) + " Search: " + std::to_string(boostNorm001.second));
 
     std::pair<double, double> boostNorm0001 = searchInBoostRtree<64>("../Benchmarks/normal_sample.0001.tmp", exampleQueries);
-    logMessageSample("Normal 0.0001 with boost R-tree: " + std::to_string(boostNorm0001.second));
+    logMessageSample("Normal 0.0001 with boost R-tree: Build: " + std::to_string(boostNorm0001.first) + " Search: " + std::to_string(boostNorm0001.second));
 
-    output_sample.close();*/
+    output_sample.close();
 
     // boost R-tree
     std::ofstream output_boost = std::ofstream("../Benchmarks/benchmark_boost.txt");
     auto logMessageBoost = [&output_boost](const std::string& message) { logMessageWithStream(message, output_boost); };
-    logMessageBoost("Building the boost R-tree with M=16");
+    logMessageBoost("Building the boost R-tree with M=64");
 
     std::pair<double, double> boost64 = searchInBoostRtree<64>(sourceFile, exampleQueries);
     logMessageBoost("M = 64: Built in " + std::to_string(boost64.first) + " and searched in: " + std::to_string(boost64.second));
 
     output_boost.close();
+
+    // different M on sample data
+    std::ofstream output_building_sample = std::ofstream("../Benchmarks/benchmark_building_sample_M.txt");
+    auto logMessageSampleM = [&output_building_sample](const std::string& message) { logMessageWithStream(message, output_building_sample); };
+    logMessageSampleM("Building my own R-tree with different M on the sample data");
+
+    Rtree rtree2Sample = Rtree(99999999999);
+    auto startTime = std::chrono::high_resolution_clock::now();
+    rtree2Sample.BuildTree("../Benchmarks/uniform_sample", ".001", 2, "../Benchmarks/rtree_build_sampleM_2_Uni001");
+    rtree2Sample.BuildTree("../Benchmarks/uniform_sample", ".0001", 2, "../Benchmarks/rtree_build_sampleM_2_Uni0001");
+    auto stopTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 2: Uniform Built in " + std::to_string(duration.count() / 2.0));
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree2Sample.BuildTree("../Benchmarks/normal_sample", ".001", 2, "../Benchmarks/rtree_build_sampleM_2_Norm001");
+    rtree2Sample.BuildTree("../Benchmarks/normal_sample", ".0001", 2, "../Benchmarks/rtree_build_sampleM_2_Norm0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 2: Normal Built in " + std::to_string(duration.count() / 2.0));
+
+    Rtree rtree4Sample = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree4Sample.BuildTree("../Benchmarks/uniform_sample", ".001", 4, "../Benchmarks/rtree_build_sampleM_4_Uni001");
+    rtree4Sample.BuildTree("../Benchmarks/uniform_sample", ".0001", 4, "../Benchmarks/rtree_build_sampleM_4_Uni0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 4: Uniform Built in " + std::to_string(duration.count() / 2.0));
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree4Sample.BuildTree("../Benchmarks/normal_sample", ".001", 4, "../Benchmarks/rtree_build_sampleM_4_Norm001");
+    rtree4Sample.BuildTree("../Benchmarks/normal_sample", ".0001", 4, "../Benchmarks/rtree_build_sampleM_4_Norm0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 4: Normal Built in " + std::to_string(duration.count() / 2.0));
+
+    Rtree rtree8Sample = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree8Sample.BuildTree("../Benchmarks/uniform_sample", ".001", 8, "../Benchmarks/rtree_build_sampleM_8_Uni001");
+    rtree8Sample.BuildTree("../Benchmarks/uniform_sample", ".0001", 8, "../Benchmarks/rtree_build_sampleM_8_Uni0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 8: Uniform Built in " + std::to_string(duration.count() / 2.0));
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree8Sample.BuildTree("../Benchmarks/normal_sample", ".001", 8, "../Benchmarks/rtree_build_sampleM_8_Norm001");
+    rtree8Sample.BuildTree("../Benchmarks/normal_sample", ".0001", 8, "../Benchmarks/rtree_build_sampleM_8_Norm0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 8: Normal Built in " + std::to_string(duration.count() / 2.0));
+
+    Rtree rtree16Sample = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree16Sample.BuildTree("../Benchmarks/uniform_sample", ".001", 16, "../Benchmarks/rtree_build_sampleM_16_Uni001");
+    rtree16Sample.BuildTree("../Benchmarks/uniform_sample", ".0001", 16, "../Benchmarks/rtree_build_sampleM_16_Uni0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 16: Uniform Built in " + std::to_string(duration.count() / 2.0));
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree16Sample.BuildTree("../Benchmarks/normal_sample", ".001", 16, "../Benchmarks/rtree_build_sampleM_16_Norm001");
+    rtree16Sample.BuildTree("../Benchmarks/normal_sample", ".0001", 16, "../Benchmarks/rtree_build_sampleM_16_Norm0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 16: Normal Built in " + std::to_string(duration.count() / 2.0));
+
+    Rtree rtree32Sample = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree32Sample.BuildTree("../Benchmarks/uniform_sample", ".001", 32, "../Benchmarks/rtree_build_sampleM_32_Uni001");
+    rtree32Sample.BuildTree("../Benchmarks/uniform_sample", ".0001", 32, "../Benchmarks/rtree_build_sampleM_32_Uni0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 32: Uniform Built in " + std::to_string(duration.count() / 2.0));
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree32Sample.BuildTree("../Benchmarks/normal_sample", ".001", 32, "../Benchmarks/rtree_build_sampleM_32_Norm001");
+    rtree32Sample.BuildTree("../Benchmarks/normal_sample", ".0001", 32, "../Benchmarks/rtree_build_sampleM_32_Norm0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 32: Normal Built in " + std::to_string(duration.count() / 2.0));
+
+    Rtree rtree64Sample = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree64Sample.BuildTree("../Benchmarks/uniform_sample", ".001", 64, "../Benchmarks/rtree_build_sampleM_64_Uni001");
+    rtree64Sample.BuildTree("../Benchmarks/uniform_sample", ".0001", 64, "../Benchmarks/rtree_build_sampleM_64_Uni0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 64: Uniform Built in " + std::to_string(duration.count() / 2.0));
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree64Sample.BuildTree("../Benchmarks/normal_sample", ".001", 64, "../Benchmarks/rtree_build_sampleM_64_Norm001");
+    rtree64Sample.BuildTree("../Benchmarks/normal_sample", ".0001", 64, "../Benchmarks/rtree_build_sampleM_64_Norm0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 64: Normal Built in " + std::to_string(duration.count() / 2.0));
+
+    Rtree rtree128Sample = Rtree(99999999999);
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree128Sample.BuildTree("../Benchmarks/uniform_sample", ".001", 128, "../Benchmarks/rtree_build_sampleM_128_Uni001");
+    rtree128Sample.BuildTree("../Benchmarks/uniform_sample", ".0001", 128, "../Benchmarks/rtree_build_sampleM_128_Uni0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 128: Uniform Built in " + std::to_string(duration.count() / 2.0));
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree128Sample.BuildTree("../Benchmarks/normal_sample", ".001", 128, "../Benchmarks/rtree_build_sampleM_128_Norm001");
+    rtree128Sample.BuildTree("../Benchmarks/normal_sample", ".0001", 128, "../Benchmarks/rtree_build_sampleM_128_Norm0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 128: Normal Built in " + std::to_string(duration.count() / 2.0));
+
+    Rtree rtree1024Sample = Rtree(99999999999);
+    auto startTime = std::chrono::high_resolution_clock::now();
+    rtree1024Sample.BuildTree("../Benchmarks/uniform_sample", ".001", 1024, "../Benchmarks/rtree_build_sampleM_1024_Uni001");
+    rtree1024Sample.BuildTree("../Benchmarks/uniform_sample", ".0001", 1024, "../Benchmarks/rtree_build_sampleM_1024_Uni0001");
+    auto stopTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 1024: Uniform Built in " + std::to_string(duration.count() / 2.0));
+    startTime = std::chrono::high_resolution_clock::now();
+    rtree1024Sample.BuildTree("../Benchmarks/normal_sample", ".001", 1024, "../Benchmarks/rtree_build_sampleM_1024_Norm001");
+    rtree1024Sample.BuildTree("../Benchmarks/normal_sample", ".0001", 1024, "../Benchmarks/rtree_build_sampleM_1024_Norm0001");
+    stopTime = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(stopTime - startTime);
+    logMessageSampleM("M = 1024: Normal Built in " + std::to_string(duration.count() / 2.0));
+
+    output_building_sample.close();
+
+    // R-tree search on samples
+    Rtree rtree2Sample = Rtree(99999999999);
+    Rtree rtree4Sample = Rtree(99999999999);
+    Rtree rtree8Sample = Rtree(99999999999);
+    Rtree rtree16Sample = Rtree(99999999999);
+    Rtree rtree32Sample = Rtree(99999999999);
+    Rtree rtree64Sample = Rtree(99999999999);
+    Rtree rtree128Sample = Rtree(99999999999);
+    
+    std::ofstream output_search_samples = std::ofstream("../Benchmarks/benchmark_search_samplesM.txt");
+    auto logMessageSearchSample = [&output_search_samples](const std::string& message) { logMessageWithStream(message, output_search_samples); };
+    logMessageSearchSample("Search my own R-tree with different M on the sample data");
+
+    rtree2Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_2_Uni001");
+    double rtreeSearch2Uni001 = searchRtree(rtree2Sample, exampleQueries);
+    rtree2Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_2_Uni0001");
+    double rtreeSearch2Uni0001 = searchRtree(rtree2Sample, exampleQueries);
+    logMessageSearchSample("M = 2: Uniform Searched in " + std::to_string((rtreeSearch2Uni001 + rtreeSearch2Uni0001) / 2.0));
+    rtree2Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_2_Norm001");
+    double rtreeSearch2Norm001 = searchRtree(rtree2Sample, exampleQueries);
+    rtree2Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_2_Norm0001");
+    double rtreeSearch2Norm0001 = searchRtree(rtree2Sample, exampleQueries);
+    logMessageSearchSample("M = 2: Normal Searched in " + std::to_string((rtreeSearch2Norm001 + rtreeSearch2Norm0001) / 2.0));
+
+    rtree4Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_4_Uni001");
+    double rtreeSearch4Uni001 = searchRtree(rtree4Sample, exampleQueries);
+    rtree4Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_4_Uni0001");
+    double rtreeSearch4Uni0001 = searchRtree(rtree4Sample, exampleQueries);
+    logMessageSearchSample("M = 4: Uniform Searched in " + std::to_string((rtreeSearch4Uni001 + rtreeSearch4Uni0001) / 2.0));
+    rtree4Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_4_Norm001");
+    double rtreeSearch4Norm001 = searchRtree(rtree4Sample, exampleQueries);
+    rtree4Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_4_Norm0001");
+    double rtreeSearch4Norm0001 = searchRtree(rtree4Sample, exampleQueries);
+    logMessageSearchSample("M = 4: Normal Searched in " + std::to_string((rtreeSearch4Norm001 + rtreeSearch4Norm0001) / 2.0));
+
+    rtree8Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_8_Uni001");
+    double rtreeSearch8Uni001 = searchRtree(rtree8Sample, exampleQueries);
+    rtree8Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_8_Uni0001");
+    double rtreeSearch8Uni0001 = searchRtree(rtree8Sample, exampleQueries);
+    logMessageSearchSample("M = 8: Uniform Searched in " + std::to_string((rtreeSearch8Uni001 + rtreeSearch8Uni0001) / 2.0));
+    rtree8Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_8_Norm001");
+    double rtreeSearch8Norm001 = searchRtree(rtree8Sample, exampleQueries);
+    rtree8Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_8_Norm0001");
+    double rtreeSearch8Norm0001 = searchRtree(rtree8Sample, exampleQueries);
+    logMessageSearchSample("M = 8: Normal Searched in " + std::to_string((rtreeSearch8Norm001 + rtreeSearch8Norm0001) / 2.0));
+
+    rtree16Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_16_Uni001");
+    double rtreeSearch16Uni001 = searchRtree(rtree16Sample, exampleQueries);
+    rtree16Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_16_Uni0001");
+    double rtreeSearch16Uni0001 = searchRtree(rtree16Sample, exampleQueries);
+    logMessageSearchSample("M = 16: Uniform Searched in " + std::to_string((rtreeSearch16Uni001 + rtreeSearch16Uni0001) / 2.0));
+    rtree16Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_16_Norm001");
+    double rtreeSearch16Norm001 = searchRtree(rtree16Sample, exampleQueries);
+    rtree16Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_16_Norm0001");
+    double rtreeSearch16Norm0001 = searchRtree(rtree16Sample, exampleQueries);
+    logMessageSearchSample("M = 16: Normal Searched in " + std::to_string((rtreeSearch16Norm001 + rtreeSearch16Norm0001) / 2.0));
+
+    rtree32Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_32_Uni001");
+    double rtreeSearch32Uni001 = searchRtree(rtree32Sample, exampleQueries);
+    rtree32Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_32_Uni0001");
+    double rtreeSearch32Uni0001 = searchRtree(rtree32Sample, exampleQueries);
+    logMessageSearchSample("M = 32: Uniform Searched in " + std::to_string((rtreeSearch32Uni001 + rtreeSearch32Uni0001) / 2.0));
+    rtree32Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_32_Norm001");
+    double rtreeSearch32Norm001 = searchRtree(rtree32Sample, exampleQueries);
+    rtree32Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_32_Norm0001");
+    double rtreeSearch32Norm0001 = searchRtree(rtree32Sample, exampleQueries);
+    logMessageSearchSample("M = 32: Normal Searched in " + std::to_string((rtreeSearch32Norm001 + rtreeSearch32Norm0001) / 2.0));
+
+    rtree64Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_64_Uni001");
+    double rtreeSearch64Uni001 = searchRtree(rtree64Sample, exampleQueries);
+    rtree64Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_64_Uni0001");
+    double rtreeSearch64Uni0001 = searchRtree(rtree64Sample, exampleQueries);
+    logMessageSearchSample("M = 64: Uniform Searched in " + std::to_string((rtreeSearch64Uni001 + rtreeSearch64Uni0001) / 2.0));
+    rtree64Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_64_Norm001");
+    double rtreeSearch64Norm001 = searchRtree(rtree64Sample, exampleQueries);
+    rtree64Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_64_Norm0001");
+    double rtreeSearch64Norm0001 = searchRtree(rtree64Sample, exampleQueries);
+    logMessageSearchSample("M = 64: Normal Searched in " + std::to_string((rtreeSearch64Norm001 + rtreeSearch64Norm0001) / 2.0));
+
+    rtree128Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_128_Uni001");
+    double rtreeSearch128Uni001 = searchRtree(rtree128Sample, exampleQueries);
+    rtree128Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_128_Uni0001");
+    double rtreeSearch128Uni0001 = searchRtree(rtree128Sample, exampleQueries);
+    logMessageSearchSample("M = 128: Uniform Searched in " + std::to_string((rtreeSearch128Uni001 + rtreeSearch128Uni0001) / 2.0));
+    rtree128Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_128_Norm001");
+    double rtreeSearch128Norm001 = searchRtree(rtree128Sample, exampleQueries);
+    rtree128Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_128_Norm0001");
+    double rtreeSearch128Norm0001 = searchRtree(rtree128Sample, exampleQueries);
+    logMessageSearchSample("M = 128: Normal Searched in " + std::to_string((rtreeSearch128Norm001 + rtreeSearch128Norm0001) / 2.0));
+
+
+    rtree1024Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_1024_Uni001");
+    double rtreeSearch1024Uni001 = searchRtree(rtree1024Sample, exampleQueries);
+    rtree1024Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_1024_Uni0001");
+    double rtreeSearch1024Uni0001 = searchRtree(rtree1024Sample, exampleQueries);
+    logMessageSearchSample("M = 1024: Uniform Searched in " + std::to_string((rtreeSearch1024Uni001 + rtreeSearch1024Uni0001) / 2.0));
+    rtree1024Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_1024_Norm001");
+    double rtreeSearch1024Norm001 = searchRtree(rtree1024Sample, exampleQueries);
+    rtree1024Sample.SetupForSearch("../Benchmarks/rtree_build_sampleM_1024_Norm0001");
+    double rtreeSearch1024Norm0001 = searchRtree(rtree1024Sample, exampleQueries);
+    logMessageSearchSample("M = 1024: Normal Searched in " + std::to_string((rtreeSearch1024Norm001 + rtreeSearch1024Norm0001) / 2.0));
+    
+    output_search_samples.close();*/
 }
