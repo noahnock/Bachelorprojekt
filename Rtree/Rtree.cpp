@@ -76,7 +76,7 @@ void searchDFS(BasicGeometry::BoundingBox query, const std::string& folder, std:
             nodes.pop();
         }
 
-        /*if (currentNode.GetIsSearchNode()) {
+        if (currentNode.GetIsSearchNode()) {
             for (const RtreeNode& child : currentNode.GetSearchChildren()) {
                 if (intersects(query, child.GetBoundingBox())) {
                     // in this case we are never at the last inner node due to the construction of the cache
@@ -84,7 +84,8 @@ void searchDFS(BasicGeometry::BoundingBox query, const std::string& folder, std:
                     nodes.push(child);
                 }
             }
-        }*/
+            continue;
+        }
 
         for (RTreeValue child : currentNode.GetChildren()) {
             if (intersects(query, child.box)) {
@@ -107,9 +108,16 @@ void searchDFS(BasicGeometry::BoundingBox query, const std::string& folder, std:
     nodesIfs.close();
 }
 
+multiBoxGeo Rtree::SearchTree(BasicGeometry::BoundingBox query, const std::string& folder) {
+    this->maxBuildingRamUsage_ = 0;
+    SetupForSearch(folder);
+
+    return this->SearchTree(query);
+}
+
 multiBoxGeo Rtree::SearchTree(BasicGeometry::BoundingBox query) {
     if (this->searchFolder_.empty()) {
-        std::cout << "Error. Call SetupForSearch before calling SearchTree" << std::endl;  // TODO
+        std::cout << "Error. Call SetupForSearch before calling SearchTree or call SearchTree(query, searchFolder)" << std::endl;  // TODO
         return {};
     }
 
@@ -168,7 +176,7 @@ void Rtree::SetupForSearch(std::string folder) {
 
     int64_t totalMemoryEstimate = memoryEstimateOfNode;
     int64_t memoryAllowed = this->maxBuildingRamUsage_ - totalMemoryEstimate; // TODO
-    memoryAllowed = 0;
+    //memoryAllowed = 0;
 
     while (!nodesQueue.empty()) {
         RtreeNode currentNode = nodesQueue.front();

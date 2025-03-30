@@ -66,6 +66,7 @@ public:
     // ___________________________________________________________________________
     // Search for an intersection of query with any elements of the Rtree
     multiBoxGeo SearchTree(BasicGeometry::BoundingBox query);
+    multiBoxGeo SearchTree(BasicGeometry::BoundingBox query, const std::string& folder);
     void SetupForSearch(std::string folder);
     explicit Rtree(uintmax_t maxBuildingRamUsage);
 };
