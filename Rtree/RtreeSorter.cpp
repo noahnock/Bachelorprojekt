@@ -108,7 +108,7 @@ RTreeValueWithOrderIndex handleD0ElementsWithoutIndex(RTreeValue& element, uint6
         boundingBox = element.box;
     } else {
         boundingBox =
-                BasicGeometry::CombineBoundingBoxes(boundingBox, element.box);  // TODO
+                BasicGeometry::CombineBoundingBoxes(boundingBox, element.box);
     }
     return entry;
 }

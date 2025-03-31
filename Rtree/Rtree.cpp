@@ -11,40 +11,6 @@
 #include <atomic>
 #include <utility>
 
-/*multiBoxGeo Rtree::SearchTree(BasicGeometry::BoundingBox query,
-                              const std::string& folder) {
-    std::ifstream lookupIfs =
-            std::ifstream(folder + "/lookup.bin", std::ios::binary);
-    std::ifstream nodesIfs =
-            std::ifstream(folder + "/nodes.bin", std::ios::binary);
-
-    RtreeNode rootNode = FileReader::LoadNode(0, lookupIfs, nodesIfs);
-    multiBoxGeo results;
-    std::stack<RtreeNode> nodes;
-    nodes.push(rootNode);
-
-    while (!nodes.empty()) {
-        RtreeNode currentNode = nodes.top();
-        nodes.pop();
-
-        for (RTreeValue child : currentNode.GetChildren()) {
-            if (intersects(query, child.box)) {
-                if (currentNode.GetIsLastInnerNode()) {
-                    results.push_back(child);
-                } else {
-                    RtreeNode newNode =
-                            FileReader::LoadNode(child.id, lookupIfs, nodesIfs);
-                    nodes.push(newNode);
-                }
-            }
-        }
-    }
-
-    lookupIfs.close();
-    nodesIfs.close();
-    return results;
-}*/
-
 void searchDFS(BasicGeometry::BoundingBox query, const std::string& folder, std::stack<RtreeNode>& nodes,
                multiBoxGeo& results, std::mutex& stackMutex, std::mutex& resultMutex,
                std::atomic<int>& threadsRemaining) {
@@ -109,34 +75,23 @@ void searchDFS(BasicGeometry::BoundingBox query, const std::string& folder, std:
 }
 
 multiBoxGeo Rtree::SearchTree(BasicGeometry::BoundingBox query, const std::string& folder) {
-    this->maxBuildingRamUsage_ = 0;
+    maxBuildingRamUsage_ = 0;
     SetupForSearch(folder);
 
-    return this->SearchTree(query);
+    return SearchTree(query);
 }
 
 multiBoxGeo Rtree::SearchTree(BasicGeometry::BoundingBox query) {
-    if (this->searchFolder_.empty()) {
-        std::cout << "Error. Call SetupForSearch before calling SearchTree or call SearchTree(query, searchFolder)" << std::endl;  // TODO
+    if (searchFolder_.empty()) {
+        std::cout << "Error. Call SetupForSearch before calling SearchTree or call SearchTree(query, searchFolder)" << std::endl;
         return {};
     }
 
-    /*std::ifstream lookupIfs =
-            std::ifstream(this->searchFolder_ + "/lookup.bin", std::ios::binary);
-    std::ifstream nodesIfs =
-            std::ifstream(this->searchFolder_ + "/nodes.bin", std::ios::binary);
-
-    RtreeNode rootNode = FileReader::LoadNode(0, lookupIfs, nodesIfs);
-
-    lookupIfs.close();
-    nodesIfs.close();*/
-
     multiBoxGeo results;
     std::stack<RtreeNode> nodes;
-    //nodes.push(rootNode);
-    nodes.push(*this->rootNode_);
+    nodes.push(*rootNode_);
 
-    const int numThreads = (int) std::thread::hardware_concurrency(); // TODO
+    const int numThreads = (int) std::thread::hardware_concurrency();
 
     std::mutex stackMutex;
     std::mutex resultMutex;
@@ -147,7 +102,7 @@ multiBoxGeo Rtree::SearchTree(BasicGeometry::BoundingBox query) {
 
     threads.reserve(numThreads);
     for (int i = 0; i < numThreads; ++i) {
-        threads.emplace_back(searchDFS, query, this->searchFolder_, std::ref(nodes), std::ref(results),
+        threads.emplace_back(searchDFS, query, searchFolder_, std::ref(nodes), std::ref(results),
                              std::ref(stackMutex), std::ref(resultMutex), std::ref(threadsRemaining));
     }
 
@@ -159,24 +114,23 @@ multiBoxGeo Rtree::SearchTree(BasicGeometry::BoundingBox query) {
 }
 
 void Rtree::SetupForSearch(std::string folder) {
-    this->searchFolder_ = std::move(folder);
+    searchFolder_ = std::move(folder);
     std::queue<RtreeNode> nodesQueue = std::queue<RtreeNode>();
 
     std::ifstream lookupIfs =
-            std::ifstream(this->searchFolder_ + "/lookup.bin", std::ios::binary);
+            std::ifstream(searchFolder_ + "/lookup.bin", std::ios::binary);
     std::ifstream nodesIfs =
-            std::ifstream(this->searchFolder_ + "/nodes.bin", std::ios::binary);
+            std::ifstream(searchFolder_ + "/nodes.bin", std::ios::binary);
 
     RtreeNode rootNode = FileReader::LoadNode(0, lookupIfs, nodesIfs);
-    this->rootNode_ = std::make_unique<RtreeNode>(rootNode);
-    nodesQueue.push(*this->rootNode_);
+    rootNode_ = std::make_unique<RtreeNode>(rootNode);
+    nodesQueue.push(*rootNode_);
 
     int64_t memoryEstimateOfNode = sizeof(uint64_t) + sizeof(BasicGeometry::BoundingBox) + 2 * sizeof(bool) + sizeof(multiBoxGeo) +
-            sizeof(std::vector<RtreeNode>) + this->rootNode_->GetChildren().size() * sizeof(RTreeValue);
+            sizeof(std::vector<RtreeNode>) + rootNode_->GetChildren().size() * sizeof(RTreeValue);
 
     int64_t totalMemoryEstimate = memoryEstimateOfNode;
-    int64_t memoryAllowed = this->maxBuildingRamUsage_ - totalMemoryEstimate; // TODO
-    //memoryAllowed = 0;
+    int64_t memoryAllowed = maxBuildingRamUsage_ - totalMemoryEstimate;
 
     while (!nodesQueue.empty()) {
         RtreeNode currentNode = nodesQueue.front();
@@ -203,11 +157,8 @@ void Rtree::SetupForSearch(std::string folder) {
 
     lookupIfs.close();
     nodesIfs.close();
-
-    std::cout << "Done" << std::endl;
 }
 
-Rtree::Rtree(uintmax_t maxBuildingRamUsage) {
-    this->maxBuildingRamUsage_ = maxBuildingRamUsage;  // TODO also search ram
-    this->searchFolder_ = "";
+Rtree::Rtree(uintmax_t maxBuildingRamUsage)
+    : maxBuildingRamUsage_{maxBuildingRamUsage} {
 }

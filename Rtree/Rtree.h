@@ -17,7 +17,6 @@
 #include <unordered_map>
 
 #include "./RtreeBasicGeometry.h"
-//#include "RtreeNode.h"
 
 // ___________________________________________________________________________
 // Forward declaration
@@ -33,16 +32,13 @@ struct SplitBuffers;
 // Data type to store all the information of the rectangles (in ram or on disk)
 // + the small lists for one dimension
 struct RectanglesForOrderedBoxes {
-    std::variant<multiBoxWithOrderIndex, std::filesystem::path> rectangles;
-    multiBoxWithOrderIndex rectanglesSmall;
+    std::variant<multiBoxWithOrderIndex, std::filesystem::path> rectangles = {};
+    multiBoxWithOrderIndex rectanglesSmall = multiBoxWithOrderIndex();
 
-    RectanglesForOrderedBoxes() {
-        rectangles = {};
-        rectanglesSmall = multiBoxWithOrderIndex();
-    }
+    RectanglesForOrderedBoxes() = default;
 
     void Clear() {
-        rectanglesSmall = multiBoxWithOrderIndex();
+        rectanglesSmall.clear();
         if (std::holds_alternative<multiBoxWithOrderIndex>(rectangles)) {
             rectangles = multiBoxWithOrderIndex();
         }
@@ -75,7 +71,7 @@ public:
 // Data structure handling the datapoints of the Rtree sorted in x and y
 // direction (either on ram or on disk)
 class OrderedBoxes {
-public: // TODO
+private:
     bool workInRam_{};
     uint64_t size_{};
     BasicGeometry::BoundingBox boundingBox_{};

@@ -8,8 +8,6 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/serialization/vector.hpp>
 
-#include "./Rtree.h"
-
 FileReader::iterator& FileReader::iterator::operator++() {
     BasicGeometry::BoundingBox box;
     uint64_t id;
@@ -104,21 +102,17 @@ void FileReader::SaveEntryWithOrderIndex(RTreeValueWithOrderIndex treeValue,
 multiBoxGeo FileReaderWithoutIndex::LoadEntries(
         const std::filesystem::path& file) {
     multiBoxGeo boxes;
-
     for (const RTreeValue& element : FileReaderWithoutIndex(file)) {
         boxes.push_back(element);
     }
-
     return boxes;
 }
 
 multiBoxWithOrderIndex FileReader::LoadEntriesWithOrderIndex(
         const std::filesystem::path& file) {
     multiBoxWithOrderIndex boxes;
-
     for (const RTreeValueWithOrderIndex& element : FileReader(file)) {
         boxes.push_back(element);
     }
-
     return boxes;
 }
