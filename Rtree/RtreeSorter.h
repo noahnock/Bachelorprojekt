@@ -7,6 +7,11 @@
 
 #include "./Rtree.h"
 
+// ___________________________________________________________________________
+// Sort the input and create the first set of OrderedBoxes
+// Files should be binary files, only containing the boundingbox and id like created by ConvertWordToRtreeEntry
+// onDiskBase + fileSuffix + ".tmp" is the absolute path to the file
+// M is the desired branching factor of the R-tree
 OrderedBoxes SortInput(const std::string& onDiskBase,
                        const std::string& fileSuffix, size_t M,
                        uintmax_t maxBuildingRamUsage, bool workInRam);

@@ -3,7 +3,6 @@
 //  Author: Noah Nock <noah.v.nock@gmail.com>
 
 #include "./RtreeNode.h"
-
 #include "./RtreeFileReader.h"
 
 // ___________________________________________________________________________
